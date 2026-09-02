@@ -8,7 +8,9 @@ function req(url, opt) {
     if (!opt) opt = {};
     if (!opt.headers) opt.headers = {};
     opt.headers['User-Agent'] = UA;
-    return http(url, opt);
+    var res = http(url, opt);
+    // http() 返回 {code, headers, content},取 content 字符串
+    return (res && typeof res.content === 'string') ? res.content : '';
 }
 
 function _parseItems(html) {
