@@ -1,5 +1,5 @@
 // FongMi/TV Spider — ppnix.com
-// 兼容 cat.js 格式：导出 __jsEvalReturn 返回 Spider 对象
+// 使用 ES Module export default 兼容 FongMi QuickJS
 
 const HOST = 'https://www.ppnix.com';
 const UA = 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36';
@@ -8,20 +8,17 @@ function req(url, opt) {
     if (!opt) opt = {};
     if (!opt.headers) opt.headers = {};
     opt.headers['User-Agent'] = UA;
-    // 必须传 async:false,否则 http() 返回 Promise 而非 {code,headers,content}
+    // http() 必须传 async:false,否则返回 Promise 而非 {code,headers,content}
     var res = http(url, Object.assign({async: false}, opt));
     return (res && typeof res.content === 'string') ? res.content : '';
 }
 
 function _parseItems(html) {
-    // 实际 HTML 格式:
-    // <li><a href="/movie/8470.html" class="thumbnail" target="_blank">
+    const items = [];
+    // 实际 HTML: <li><a href="/movie/8470.html" class="thumbnail"...>
     //   <img referrerpolicy="no-referrer" src="https://..." class="thumb" alt="title">
-    //   <div class="countrie"><span class="orange">2025</span></div>
-    //   <div class="note"><span></span></div>
     // </a><h2><a href="/movie/8470.html" target="_blank" title="title">title</a></h2>
     // <footer><span class="star star35"></span><span class="rate">7</span></footer></li>
-    const items = [];
     const re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
     var m;
     while ((m = re.exec(html)) !== null) {
@@ -36,7 +33,6 @@ function _parseItems(html) {
 }
 
 function parseM3u8(html) {
-    // infoid=8458;m3u8=['1080P']
     var infoid = (html.match(/infoid=(\d+)/) || [])[1];
     if (!infoid) return null;
     var m3u8Arr = (html.match(/m3u8\s*=\s*\[([^\]]+)\]/) || [])[1];
@@ -45,23 +41,19 @@ function parseM3u8(html) {
     return infoid + '|' + episodes.join('$');
 }
 
-// 构建分类过滤 URL
-// 格式: /{type_id}/{genre}-{country}-{year}-{sort}.html
-// 4段用join连接(3个分隔符) + 末尾额外1个横杠 = 共4个横杠
-// 例: 全部 → /movie/----.html, Drama → /movie/Drama----.html
-//     年份2026 → /movie/--2026--.html, 第2页 → /movie/---2-.html
+// 构建分类过滤 URL: /{type_id}/{genre}-{country}-{year}-{sort}.html
+// 4段用join连接 + 末尾额外1横杠
 function buildFilterUrl(tid, extend, pg) {
     var genre = extend.type || '';
     var country = extend.country || '';
     var year = extend.year || '';
-    // 分页: 把 page 放在 sort 位置 (最后一段)
     var sort = '';
     if (pg > 1) sort = pg;
     return '/' + tid + '/' + [genre, country, year, sort].join('-') + '-.html';
 }
 
-function __jsEvalReturn() {
-    return {
+function createSpider() {
+    var spider = {
         meta: {},
 
         home: function(filter) {
@@ -73,29 +65,29 @@ function __jsEvalReturn() {
                 var filters = {};
                 ['movie', 'tv'].forEach(function(tid) {
                     filters[tid] = [
-                        { key: 'type',   name: '类型',   default: '',
+                        { key: 'type', name: '类型', default: '',
                           value: [
-                              { n: '全部',     v: '' },
-                              { n: '动作',     v: 'Action' },
-                              { n: '喜剧',     v: 'Comedy' },
-                              { n: '爱情',     v: 'Romance' },
-                              { n: '科幻',     v: 'Sci-Fi' },
-                              { n: '恐怖',     v: 'Horror' },
-                              { n: '剧情',     v: 'Drama' },
-                              { n: '悬疑',     v: 'Mystery' },
-                              { n: '惊悚',     v: 'Thriller' },
-                              { n: '动画',     v: 'Animation' },
-                              { n: '犯罪',     v: 'Crime' },
-                              { n: '冒险',     v: 'Adventure' },
-                              { n: '奇幻',     v: 'Fantasy' },
-                              { n: '传记',     v: 'Biography' },
-                              { n: '历史',     v: 'History' },
-                              { n: '战争',     v: 'War' },
-                              { n: '音乐',     v: 'Music' },
-                              { n: '体育',     v: 'Sport' },
-                              { n: '纪录片',   v: 'Documentary' }
+                              { n: '全部', v: '' },
+                              { n: '动作', v: 'Action' },
+                              { n: '喜剧', v: 'Comedy' },
+                              { n: '爱情', v: 'Romance' },
+                              { n: '科幻', v: 'Sci-Fi' },
+                              { n: '恐怖', v: 'Horror' },
+                              { n: '剧情', v: 'Drama' },
+                              { n: '悬疑', v: 'Mystery' },
+                              { n: '惊悚', v: 'Thriller' },
+                              { n: '动画', v: 'Animation' },
+                              { n: '犯罪', v: 'Crime' },
+                              { n: '冒险', v: 'Adventure' },
+                              { n: '奇幻', v: 'Fantasy' },
+                              { n: '传记', v: 'Biography' },
+                              { n: '历史', v: 'History' },
+                              { n: '战争', v: 'War' },
+                              { n: '音乐', v: 'Music' },
+                              { n: '体育', v: 'Sport' },
+                              { n: '纪录片', v: 'Documentary' }
                           ]},
-                        { key: 'year',  name: '年份',  default: '',
+                        { key: 'year', name: '年份', default: '',
                           value: [
                               { n: '全部', v: '' },
                               { n: '2026', v: '2026' },
@@ -113,6 +105,7 @@ function __jsEvalReturn() {
                     filters: filters
                 });
             } catch (e) {
+                console.log('home error:', e);
                 return JSON.stringify({ class: [], filters: {} });
             }
         },
@@ -122,14 +115,14 @@ function __jsEvalReturn() {
                 var pagePath = buildFilterUrl(tid, extend, pg);
                 var html = req(HOST + pagePath);
                 var list = _parseItems(html);
-                var total = 1;
                 return JSON.stringify({
                     list: list,
                     page: pg,
-                    pagecount: total,
+                    pagecount: 1,
                     limit: list.length
                 });
             } catch (e) {
+                console.log('category error:', e);
                 return JSON.stringify({ list: [], page: pg, pagecount: 1, limit: 0 });
             }
         },
@@ -157,6 +150,7 @@ function __jsEvalReturn() {
                 }];
                 return JSON.stringify({ list: vod });
             } catch (e) {
+                console.log('detail error:', e);
                 return JSON.stringify({ list: [] });
             }
         },
@@ -166,7 +160,6 @@ function __jsEvalReturn() {
                 var searchUrl = HOST + '/search/' + encodeURIComponent(key) + '/';
                 var html = req(searchUrl);
                 var items = [];
-                // 搜索返回格式与分类页相同
                 var re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
                 var m;
                 while ((m = re.exec(html)) !== null) {
@@ -184,6 +177,7 @@ function __jsEvalReturn() {
                     limit: items.length
                 });
             } catch (e) {
+                console.log('search error:', e);
                 return JSON.stringify({ list: [], page: 1, pagecount: 1 });
             }
         },
@@ -196,6 +190,8 @@ function __jsEvalReturn() {
             }
         }
     };
+    console.log('ppnix spider created');
+    return spider;
 }
 
-export { __jsEvalReturn };
+export default createSpider;
