@@ -45,14 +45,17 @@ function parseM3u8(html) {
 
 // 构建分类过滤 URL
 // 格式: /{type_id}/{genre}-{country}-{year}-{sort}.html
-// 每段可空，用 "-" 连接，结尾 ".html"
-function buildFilterUrl(tid, extend) {
+// 4段用join连接(3个分隔符) + 末尾额外1个横杠 = 共4个横杠
+// 例: 全部 → /movie/----.html, Drama → /movie/Drama----.html
+//     年份2026 → /movie/--2026--.html, 第2页 → /movie/---2-.html
+function buildFilterUrl(tid, extend, pg) {
     var genre = extend.type || '';
     var country = extend.country || '';
     var year = extend.year || '';
-    // 国家过滤器返回空内容，跳过
-    var url = '/' + tid + '/' + genre + '-' + country + '-' + year + '-.html';
-    return url;
+    // 分页: 把 page 放在 sort 位置 (最后一段)
+    var sort = '';
+    if (pg > 1) sort = pg;
+    return '/' + tid + '/' + [genre, country, year, sort].join('-') + '-.html';
 }
 
 function __jsEvalReturn() {
@@ -114,13 +117,7 @@ function __jsEvalReturn() {
 
         category: function(tid, pg, filter, extend) {
             try {
-                var url = buildFilterUrl(tid, extend);
-                // 分页: 在 .html 前插入 _pg
-                var pagePath = url.replace(/\.html$/, function(match, offset, string) {
-                    return '_' + pg + '.html';
-                });
-                // 第一页无分页后缀
-                if (pg <= 1) pagePath = url.replace(/\.html$/, '.html');
+                var pagePath = buildFilterUrl(tid, extend, pg);
                 var html = req(HOST + pagePath);
                 var list = _parseItems(html);
                 var total = 1;
