@@ -16,7 +16,7 @@ var rule = {
     },
     "一级": ".lists-content li;img&&alt;img&&src;.rate&&Text;a&&href",
     "二级": "js:var html=request(input);var m=html.match(/classid=(\\d+);classurl='([^']+?)';infoid=(\\d+);sub='([^']*?)';m3u8=(\\[.*?\\])/);if(!m){print('no match');return;}var infoid=parseInt(m[3]);var qualities=eval(m[5]);var eps=qualities.map(function(q,i){return q+'$'+rule.host+'/info/m3u8/'+infoid+'/'+q+'.m3u8'});var vod={vod_id:String(infoid),vod_name:'',vod_pic:'',vod_play_from:'PPnix',vod_play_url:eps.join('#')};VOD=vod;",
-    "lazy": "js:var m3u8=request(input);var keyUrl='https://www.ppnix.com/info/m3u8/key';var m=m3u8.indexOf('../key');if(m>=0){m3u8=m3u8.substring(0,m)+keyUrl+m3u8.substring(m+8);}var m2=m3u8.indexOf('https://ipfs.ppnix.com/ipfs/baf');if(m2>=0){var s='';for(var i=m2;i<m3u8.length;i++){var c=m3u8[i];if(!c||c==='\\n'||c==='\\r'||c===' '||c==='\"'||c==='#')break;s+=c;}if(s&&!s.endsWith('.ts'))m3u8=m3u8.replace(s,s+'.ts');}input={parse:1,url:m3u8};",
+    "lazy": "js:var m3u8=request(input);var keyUrl='https://www.ppnix.com/info/m3u8/key';m3u8=m3u8.replace(/\\.\\.\\/key/g,keyUrl);var segs=m3u8.match(/https:\\/\\/ipfs\\.ppnix\\.com\\/ipfs\\/[a-zA-Z0-9]+/g)||[];for(var i=0;i<segs.length;i++){var seg=segs[i];if(!seg.endsWith('.ts')){m3u8=m3u8.split(seg).join(seg+'.ts');}}input={parse:1,url:m3u8};",
     "搜索": "*",
     "pagecount": {"movie":"1","tv":"1"},
     "playparse": 1,
