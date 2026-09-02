@@ -1,0 +1,12 @@
+{
+  "urls": [
+    {
+      "name": "PPnix影视",
+      "key": "ppnix",
+      "type": 1,
+      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/ppnix.js",
+      "searchable": 2,
+      "filterable": 1
+    }
+  ]
+}
