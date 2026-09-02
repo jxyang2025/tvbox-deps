@@ -12,9 +12,11 @@ var rule = {
     "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     },
-    "一级": "js:var d=[];var items=pdfa(html,\".lists-content li\");if(!items.length){items=pdfa(html,\".lists-content h2 a\");items.forEach(function(it){var title=pdfh(it,\"Text\");var href=pd(it,\"href\");if(title&&href){d.push({url:href,title:title,img:\"\",desc:\"\"})}})}else{items.forEach(function(it){var title=pdfh(it,\"h2 a&&Text\");var href=pd(it,\"a&&href\");var img=pd(it,\"img&&src\");var rate=pdfh(it,\".rate&&Text\");if(title&&href){d.push({url:href,title:title,img:img,desc:rate})}})}setResult(d);",
-    "二级": "js:var html=request(input);var m=html.match(/classid=(\\d+);classurl='([^']+?)';infoid=(\\d+);sub='([^']*?)';m3u8=(\\[.*?\\])/);if(!m){print(\"no match\");return;}var infoid=parseInt(m[3]);var qualities=eval(m[5]);var eps=qualities.map(function(q,i){return q+\"$\"+rule.host+\"/info/m3u8/\"+infoid+\"/\"+q+\".m3u8\"});var vod={vod_id:String(infoid),vod_name:\"\",vod_pic:\"\",vod_play_from:\"PPnix\",vod_play_url:eps.join(\"#\")};input=vod;",
+    "一级": "js:var html=request(input);var d=[];var items=pdfa(html,\".lists-content li\");if(!items.length){items=pdfa(html,\".lists-content h2 a\");items.forEach(function(it){var title=pdfh(it,\"Text\");var href=pd(it,\"href\");if(title&&href){d.push({url:href,title:title,img:\"\",desc:\"\"})}})}else{items.forEach(function(it){var title=pdfh(it,\"h2 a&&Text\");var href=pd(it,\"a&&href\");var img=pd(it,\"img&&src\");var rate=pdfh(it,\".rate&&Text\");if(title&&href){d.push({url:href,title:title,img:img,desc:rate})}})}setResult(d);",
+    "二级": "js:var html=request(input);var m=html.match(/classid=(\\d+);classurl='([^']+?)';infoid=(\\d+);sub='([^']*?)';m3u8=(\\[.*?\\])/);if(!m){print(\"no match\");return;}var infoid=parseInt(m[3]);var qualities=eval(m[5]);var eps=qualities.map(function(q,i){return q+\"$\"+rule.host+\"/info/m3u8/\"+infoid+\"/\"+q+\".m3u8\"});var vod={vod_id:String(infoid),vod_name:\"\",vod_pic:\"\",vod_play_from:\"PPnix\",vod_play_url:eps.join(\"#\")};VOD=vod;",
     "lazy": "js:var m3u8=request(input);var keyUrl=\"https://www.ppnix.com/info/m3u8/key\";var m=m3u8.indexOf('../key');if(m>=0){m3u8=m3u8.substring(0,m)+keyUrl+m3u8.substring(m+8);}var m2=m3u8.indexOf('https://ipfs.ppnix.com/ipfs/baf');if(m2>=0){var s='';for(var i=m2;i<m3u8.length;i++){var c=m3u8[i];if(!c||c=='\n'||c=='\r'||c===' '||c==='\"'||c==='#')break;s+=c;}if(s&&!s.endsWith('.ts'))m3u8=m3u8.replace(s,s+'.ts');}input={parse:1,url:m3u8};",
+    "搜索": "*",
+    "pagecount": {"movie":1,"tv":1},
     "playparse": 1,
     "parse_url": ""
 }
