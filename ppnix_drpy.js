@@ -1,44 +1,14 @@
 var rule = {
     title: 'PPnix',
     host: 'https://www.ppnix.com',
-    homeUrl: '/movie/-----.html',
-    url: '/fyclass/-----.html',
+    homeUrl: '/cn/movie/-----.html',
+    url: '/cn/fyclass/-----.html',
     class_name: '电影&电视剧',
     class_url: 'movie&tv',
-    searchUrl: '/search/**',
-    searchable: 1,
-    quickSearch: 0,
-    filterable: 0,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36'
-    },
-    timeout: 8000,
-    limit: 20,
-    play_parse: true,
-    lazy: '',
-    "一级": "js:var d=[];pdfh=jsp.pdfh;pdfa=jsp.pdfa;pd=jsp.pd;var html=request(input);var items=pdfa(html,'.lists-content&&ul&&li');items.forEach(function(it){d.push({title:pdfh(it,'h2 a&&Text').trim(),img:pd(it,'img&&src'),desc:pdfh(it,'.rate&&Text').trim(),url:pdfh(it,'a&&href')})});setResult(d);",
-    "二级": `js:
-        var html=request(input);
-        var $=cheerio.load(html);
-        var title=$('h1.product-title').text().trim();
-        var img=$('header.product-header img.thumb').attr('src')||'';
-        var desc=$('meta[name="description"]').attr('content')||'';
-        var epArr=[];
-        var m=html.match(/classid=(\\d+);classurl='([^']+?)';infoid=(\\d+);sub='([^']*?)';m3u8=(\\[.*?\\])/);
-        if(m){
-            try{epArr=JSON.parse(m[5].replace(/'/g,'"'));}catch(e){}
-        }
-        var vod_play_url='';
-        if(epArr.length>0){
-            vod_play_url=epArr.map(function(ep){return 'https://www.ppnix.com/info/m3u8/'+m[3]+'/'+ep+'.m3u8'}).join('#');
-        }
-        VOD={
-            vod_name:title,
-            vod_pic:img,
-            vod_content:desc,
-            vod_play_from:'PPnix',
-            vod_play_url:vod_play_url
-        };
-    `,
-    "搜索": "js:var d=[];pdfh=jsp.pdfh;pdfa=jsp.pdfa;pd=jsp.pd;var html=request(input);var items=pdfa(html,'.lists-content&&ul&&li');items.forEach(function(it){d.push({title:pdfh(it,'h2 a&&Text').trim(),img:pd(it,'img&&src'),desc:pdfh(it,'.rate&&Text').trim(),url:pdfh(it,'a&&href')})});setResult(d);"
-};
+    searchUrl: '/cn/search/**',
+    detailUrl: '/cn/fyclass/fid.html',
+    搜索: 'js:var d=[];var items=pdfa(html,".lists-content li");items.forEach(function(it){var title=pdfh(it,"h2 a&&Text");var href=pd(it,"a&&href");var img=pd(it,"img&&src");var rate=pdfh(it,".rate&&Text");if(title&&href){d.push({url:href,title:title,img:img,desc:rate})}});setResult(d);',
+    lazy: 'js:var m3u8=request(input);var keyUrl="https://www.ppnix.com/info/m3u8/key";m3u8=m3u8.replace(/URI="\\.\\.\\/key"/g,"URI=\\""+keyUrl+"\\"");VOD={parse:m3u8,url:input};',
+    一级: 'js:var d=[];var items=pdfa(html,".lists-content li");items.forEach(function(it){var title=pdfh(it,"h2 a&&Text");var href=pd(it,"a&&href");var img=pd(it,"img&&src");var rate=pdfh(it,".rate&&Text");if(title&&href){d.push({url:href,title:title,img:img,desc:rate})}});setResult(d);',
+    二级: 'js:var html=request(input);var m=html.match(/classid=(\\d+);classurl=\'([^\']+?)\';infoid=(\\d+);sub=\'([^\']*?)\';m3u8=(\\[.*?\\])/);if(!m){print("no match");return;}var infoid=parseInt(m[3]);var qualities=eval(m[5]);var eps=qualities.map(function(q,i){return (i+1)+"$"+rule.host+"/info/m3u8/"+infoid+"/"+q+".m3u8"});var vod={vod_id:String(infoid),vod_name:"",vod_pic:"",vod_play_from:"PPnix",vod_play_url:eps.join("#")};VOD=vod;',
+}
