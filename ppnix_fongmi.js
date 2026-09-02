@@ -8,8 +8,8 @@ function req(url, opt) {
     if (!opt) opt = {};
     if (!opt.headers) opt.headers = {};
     opt.headers['User-Agent'] = UA;
-    var res = http(url, opt);
-    // http() 返回 {code, headers, content},取 content 字符串
+    // 必须传 async:false,否则 http() 返回 Promise 而非 {code,headers,content}
+    var res = http(url, Object.assign({async: false}, opt));
     return (res && typeof res.content === 'string') ? res.content : '';
 }
 
@@ -22,11 +22,11 @@ function _parseItems(html) {
     // </a><h2><a href="/movie/8470.html" target="_blank" title="title">title</a></h2>
     // <footer><span class="star star35"></span><span class="rate">7</span></footer></li>
     const items = [];
-    const re = /<li>\s*<a\s+href="(\/movie\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
+    const re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
     var m;
     while ((m = re.exec(html)) !== null) {
         items.push({
-            vod_id: m[1].replace('.html',''),
+            vod_id: m[1].replace(/\/(?:movie|tv)\//, '').replace('.html',''),
             vod_name: m[3],
             vod_pic: m[2],
             vod_remarks: m[4]
@@ -166,16 +166,15 @@ function __jsEvalReturn() {
                 var searchUrl = HOST + '/search/' + encodeURIComponent(key) + '/';
                 var html = req(searchUrl);
                 var items = [];
-                // 搜索返回格式: <li><a href="/movie/8458.html">...</a></li>
-                // 每个结果有 href + h2+title + span.rate
-                var re = /<li>\s*<a\s+href="(\/movie\/[^"]+)"[^>]*>[\s\S]*?<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
+                // 搜索返回格式与分类页相同
+                var re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
                 var m;
                 while ((m = re.exec(html)) !== null) {
                     items.push({
-                        vod_id: m[1].replace('.html',''),
-                        vod_name: m[2],
+                        vod_id: m[1].replace(/\/(?:movie|tv)\//, '').replace('.html',''),
+                        vod_name: m[3],
                         vod_pic: 'https://www.ppnix.com/static/img/logo.png',
-                        vod_remarks: m[3]
+                        vod_remarks: m[4]
                     });
                 }
                 return JSON.stringify({
