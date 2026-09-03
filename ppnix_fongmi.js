@@ -1,197 +1,153 @@
-// FongMi/TV Spider — ppnix.com
-// 使用 ES Module export default 兼容 FongMi QuickJS
+// PPnix 影视 — FongMi/TV 原生 Spider
+// 自包含，零外部依赖
+// 仅使用 export default（不用 globalThis.__JS_SPIDER__，避免被 content.replace 破坏）
+// 直接使用 FongMi/TV 内置的 req()（来自 http.js，同步返回含 .string/.headers/.code）
 
-const HOST = 'https://www.ppnix.com';
-const UA = 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36';
+var rule = {
+    title: 'PPnix影视',
+    host: 'https://www.ppnix.com',
+    homeUrl: '/cn/movie/',
+    url: '/cn/fyclass/fypage.html',
+    class_name: '电影&电视剧',
+    class_url: 'movie&tv',
+    searchUrl: '/cn/?s=**',
+    searchable: 2,
+    quickSearch: 0,
+    filterable: 0,
+    changeable: 0,
+    timeout: 15000,
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+};
 
-function req(url, opt) {
-    if (!opt) opt = {};
-    if (!opt.headers) opt.headers = {};
-    opt.headers['User-Agent'] = UA;
-    // http() 必须传 async:false,否则返回 Promise 而非 {code,headers,content}
-    var res = http(url, Object.assign({async: false}, opt));
-    return (res && typeof res.content === 'string') ? res.content : '';
-}
+// req / http 由 FongMi/TV 的 http.js 全局提供，无需重复定义
 
-function _parseItems(html) {
-    const items = [];
-    // 实际 HTML: <li><a href="/movie/8470.html" class="thumbnail"...>
-    //   <img referrerpolicy="no-referrer" src="https://..." class="thumb" alt="title">
-    // </a><h2><a href="/movie/8470.html" target="_blank" title="title">title</a></h2>
-    // <footer><span class="star star35"></span><span class="rate">7</span></footer></li>
-    const re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
+// 解析列表页 — 返回 vod 数组
+function parseList(html) {
+    var list = [];
+    var seen = {};
+    // 匹配 <a href="/cn/movie/ID.html" ... title="NAME" ...><img src="PIC" ...></a>
+    var re = /<a[^>]*href="\/cn\/movie\/(\d+)\.html"[^>]*(?:title="([^"]*)")?[^>]*>/gi;
     var m;
     while ((m = re.exec(html)) !== null) {
-        items.push({
-            vod_id: m[1].replace(/\/(?:movie|tv)\//, '').replace('.html',''),
-            vod_name: m[3],
-            vod_pic: m[2],
-            vod_remarks: m[4]
-        });
+        var id = m[1];
+        if (seen[id]) continue;
+        seen[id] = 1;
+        var name = m[2] ? m[2].trim() : '';
+        // 取图片（在链接后 600 字符内找 img）
+        var seg = html.substring(m.index, m.index + 600);
+        var picM = seg.match(/<img[^>]*src="([^"]*)"[^>]*>/);
+        var pic = picM ? picM[1] : '';
+        if (!name) {
+            var emM = seg.match(/<(?:em|h\d|span)[^>]*>([^<]{2,40})<\/(?:em|h\d|span)>/);
+            name = emM ? emM[1].trim() : ('影片' + id);
+        }
+        list.push({ vod_id: id, vod_name: name, vod_pic: pic, vod_remarks: '电影' });
+        if (list.length >= 30) break;
     }
-    return items;
+    return list;
 }
 
-function parseM3u8(html) {
-    var infoid = (html.match(/infoid=(\d+)/) || [])[1];
-    if (!infoid) return null;
-    var m3u8Arr = (html.match(/m3u8\s*=\s*\[([^\]]+)\]/) || [])[1];
-    if (!m3u8Arr) return null;
-    var episodes = m3u8Arr.split(',').map(function(e){return e.trim().replace(/['"]/g,'');});
-    return infoid + '|' + episodes.join('$');
+function home(filter) {
+    try {
+        var html = req(rule.host + rule.homeUrl, { 'User-Agent': rule.headers['User-Agent'] });
+        var body = (html && html.string) ? html.string : String(html);
+        var list = parseList(body);
+        return JSON.stringify({ list: list });
+    } catch (e) {
+        return JSON.stringify({ list: [], error: String(e) });
+    }
 }
 
-// 构建分类过滤 URL: /{type_id}/{genre}-{country}-{year}-{sort}.html
-// 4段用join连接 + 末尾额外1横杠
-function buildFilterUrl(tid, extend, pg) {
-    var genre = extend.type || '';
-    var country = extend.country || '';
-    var year = extend.year || '';
-    var sort = '';
-    if (pg > 1) sort = pg;
-    return '/' + tid + '/' + [genre, country, year, sort].join('-') + '-.html';
+function category(tid, pg, filter, ext) {
+    if (pg <= 0) pg = 1;
+    try {
+        var url = rule.host + rule.url.replace('fyclass', tid).replace('fypage', '' + pg);
+        var html = req(url, { 'User-Agent': rule.headers['User-Agent'] });
+        var body = (html && html.string) ? html.string : String(html);
+        var list = parseList(body);
+        return JSON.stringify({ list: list, page: parseInt(pg), pagecount: 999, total: list.length });
+    } catch (e) {
+        return JSON.stringify({ list: [], error: String(e) });
+    }
 }
 
-function createSpider() {
-    var spider = {
-        meta: {},
+function detail(ids) {
+    try {
+        var id = ids[0];
+        var html = req(rule.host + '/cn/movie/' + id + '.html', { 'User-Agent': rule.headers['User-Agent'] });
+        var body = (html && html.string) ? html.string : String(html);
+        var name = '';
+        var pic = '';
+        var nm = body.match(/<h1[^>]*class="[^"]*product-title[^"]*"[^>]*>([^<]+)<\/h1>/);
+        if (!nm) nm = body.match(/<title>([^<]+)<\/title>/);
+        name = nm ? nm[1].trim() : ('影片' + id);
+        var pm = body.match(/<img[^>]*class="[^"]*thumb[^"]*"[^>]*src="([^"]*)"/);
+        if (!pm) pm = body.match(/<img[^>]*src="([^"]*)"[^>]*class="[^"]*thumb[^"]*"/);
+        pic = pm ? pm[1] : '';
 
-        home: function(filter) {
-            try {
-                var classes = [
-                    { type_id: 'movie', type_name: '电影' },
-                    { type_id: 'tv',    type_name: '电视剧' }
-                ];
-                var filters = {};
-                ['movie', 'tv'].forEach(function(tid) {
-                    filters[tid] = [
-                        { key: 'type', name: '类型', default: '',
-                          value: [
-                              { n: '全部', v: '' },
-                              { n: '动作', v: 'Action' },
-                              { n: '喜剧', v: 'Comedy' },
-                              { n: '爱情', v: 'Romance' },
-                              { n: '科幻', v: 'Sci-Fi' },
-                              { n: '恐怖', v: 'Horror' },
-                              { n: '剧情', v: 'Drama' },
-                              { n: '悬疑', v: 'Mystery' },
-                              { n: '惊悚', v: 'Thriller' },
-                              { n: '动画', v: 'Animation' },
-                              { n: '犯罪', v: 'Crime' },
-                              { n: '冒险', v: 'Adventure' },
-                              { n: '奇幻', v: 'Fantasy' },
-                              { n: '传记', v: 'Biography' },
-                              { n: '历史', v: 'History' },
-                              { n: '战争', v: 'War' },
-                              { n: '音乐', v: 'Music' },
-                              { n: '体育', v: 'Sport' },
-                              { n: '纪录片', v: 'Documentary' }
-                          ]},
-                        { key: 'year', name: '年份', default: '',
-                          value: [
-                              { n: '全部', v: '' },
-                              { n: '2026', v: '2026' },
-                              { n: '2025', v: '2025' },
-                              { n: '2024', v: '2024' },
-                              { n: '2023', v: '2023' },
-                              { n: '2022', v: '2022' },
-                              { n: '2021', v: '2021' },
-                              { n: '2020', v: '2020' }
-                          ]}
-                    ];
-                });
-                return JSON.stringify({
-                    class: classes,
-                    filters: filters
-                });
-            } catch (e) {
-                console.log('home error:', e);
-                return JSON.stringify({ class: [], filters: {} });
-            }
-        },
-
-        category: function(tid, pg, filter, extend) {
-            try {
-                var pagePath = buildFilterUrl(tid, extend, pg);
-                var html = req(HOST + pagePath);
-                var list = _parseItems(html);
-                return JSON.stringify({
-                    list: list,
-                    page: pg,
-                    pagecount: 1,
-                    limit: list.length
-                });
-            } catch (e) {
-                console.log('category error:', e);
-                return JSON.stringify({ list: [], page: pg, pagecount: 1, limit: 0 });
-            }
-        },
-
-        detail: function(ids) {
-            try {
-                var id = ids[0];
-                var url = HOST + '/movie/' + id + '.html';
-                var html = req(url);
-                var title = (html.match(/<title>([^<]+)/) || [])[1] || '';
-                var info = parseM3u8(html);
-                if (!info) return JSON.stringify({ list: [] });
-                var parts = info.split('|');
-                var infoid = parts[0];
-                var episodes = parts[1].split('$');
-                var playlist = episodes.map(function(ep) {
-                    return ep + '$' + HOST + '/info/m3u8/' + infoid + '/' + ep + '.m3u8';
-                }).join('#');
-                var vod = [{
-                    vod_id: id,
-                    vod_name: title,
-                    vod_pic: 'https://www.ppnix.com/static/img/logo.png',
-                    vod_play_from: 'PPnix',
-                    vod_play_url: playlist
-                }];
-                return JSON.stringify({ list: vod });
-            } catch (e) {
-                console.log('detail error:', e);
-                return JSON.stringify({ list: [] });
-            }
-        },
-
-        search: function(key, quick, pg) {
-            try {
-                var searchUrl = HOST + '/search/' + encodeURIComponent(key) + '/';
-                var html = req(searchUrl);
-                var items = [];
-                var re = /<li>\s*<a\s+href="(\/(?:movie|tv)\/[^"]+)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<\/a>\s*<h2><a[^>]*>([^<]+)<\/a><\/h2>[\s\S]*?<span\s+class="rate"[^>]*>([^<]+)<\/span>/g;
-                var m;
-                while ((m = re.exec(html)) !== null) {
-                    items.push({
-                        vod_id: m[1].replace(/\/(?:movie|tv)\//, '').replace('.html',''),
-                        vod_name: m[3],
-                        vod_pic: 'https://www.ppnix.com/static/img/logo.png',
-                        vod_remarks: m[4]
-                    });
-                }
-                return JSON.stringify({
-                    list: items,
-                    page: pg || 1,
-                    pagecount: 1,
-                    limit: items.length
-                });
-            } catch (e) {
-                console.log('search error:', e);
-                return JSON.stringify({ list: [], page: 1, pagecount: 1 });
-            }
-        },
-
-        play: function(flag, id, vipFlags) {
-            try {
-                return JSON.stringify({ url: id, parse: 0 });
-            } catch (e) {
-                return JSON.stringify({ url: '', parse: 0 });
+        // 提取播放集数（data-quality 或 /info/m3u8/ID/QUALITY.m3u8）
+        var eps = [];
+        var seen = {};
+        var qre = /data-quality="([^"]+)"/g;
+        var qm;
+        while ((qm = qre.exec(body)) !== null) {
+            var q = qm[1].trim();
+            if (!seen[q]) { seen[q] = 1; eps.push(q); }
+        }
+        if (eps.length === 0) {
+            var m3re = /\/info\/m3u8\/(\d+)\/(\d+\.m3u8)/g;
+            var mm;
+            while ((mm = m3re.exec(body)) !== null) {
+                var q = mm[2].replace('.m3u8', '');
+                if (!seen[q]) { seen[q] = 1; eps.push(q); }
             }
         }
-    };
-    console.log('ppnix spider created');
-    return spider;
+        eps.sort(function(a, b) { return parseInt(b) - parseInt(a); });
+        var playUrl = eps.map(function(q) {
+            return q + '$' + rule.host + '/info/m3u8/' + id + '/' + q + '.m3u8';
+        }).join('#');
+
+        return JSON.stringify({
+            list: [{
+                vod_id: id,
+                vod_name: name,
+                vod_pic: pic,
+                vod_play_from: 'PPnix',
+                vod_play_url: playUrl || '暂无播放源'
+            }]
+        });
+    } catch (e) {
+        return JSON.stringify({ list: [{ vod_id: ids[0], error: String(e) }] });
+    }
 }
 
-export default createSpider;
+function search(key, quick, pg) {
+    if (!pg) pg = 1;
+    try {
+        var url = rule.host + '/cn/?s=' + encodeURIComponent(key) + '&page=' + pg;
+        var html = req(url, { 'User-Agent': rule.headers['User-Agent'] });
+        var body = (html && html.string) ? html.string : String(html);
+        var list = parseList(body);
+        return JSON.stringify({ list: list });
+    } catch (e) {
+        return JSON.stringify({ list: [], error: String(e) });
+    }
+}
+
+function play(flag, id, flags) {
+    return JSON.stringify({ url: id, parse: 0 });
+}
+
+var spiderObj = {
+    home: home,
+    category: category,
+    detail: detail,
+    search: search,
+    play: play
+};
+
+// 只导出 default，不手动设置 globalThis.__JS_SPIDER__
+// （FongMi 的 content.replace 会破坏 globalThis.__JS_SPIDER__ 赋值）
+export default spiderObj;
