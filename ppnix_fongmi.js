@@ -1,4 +1,4 @@
-// PPnix 影视 — FongMi/TV 原生 Spider（v5 搜索本地过滤版）
+// PPnix 影视 — FongMi/TV 原生 Spider（v6 真实搜索版）
 // 修复要点：
 //   1. 分页 URL：page N → /cn/{tid}/---{N-1}-.html（/cn/{tid}/N.html 是详情页！）
 //   2. parseList 同时处理 /cn/movie/ 和 /cn/tv/ 卡片
@@ -174,35 +174,21 @@ function detail(ids) {
 }
 
 // FongMi 调用 search(key, quick) 或 search(key, quick, pg)
-// ppnix 全站无服务端搜索（GET /search/{kw}.html 和 POST 均返回热门列表）
-// 策略：抓电影+电视剧首页各一页（48条热门候选），本地按标题模糊匹配
-// 命中即返回；无匹配时返回空列表
+// ppnix 真实搜索接口：GET /cn/search/{关键词}--.html（必须带 -- 后缀）
+// 返回结果卡片与分类页结构相同（/cn/movie|tv/{id}.html + <h2> 标题），直接复用 parseList
 function search(key, quick, pg) {
     if (!pg) pg = 1;
     try {
-        var kw = (key || '').toLowerCase();
-        var all = [], seen = {};
-        // 抓电影 + 电视剧首页，共 2 个请求
-        var cats = ['movie', 'tv'];
-        for (var ci = 0; ci < cats.length; ci++) {
-            try {
-                var resp = http(rule.host + '/cn/' + cats[ci] + '/', { headers: rule.headers, async: false });
-                if (!resp || resp.code !== 200) continue;
-                var items = parseList(resp.content);
-                for (var ii = 0; ii < items.length; ii++) {
-                    var v = items[ii];
-                    if (seen[v.vod_id]) continue;
-                    seen[v.vod_id] = 1;
-                    if (kw && v.vod_name.toLowerCase().indexOf(kw) < 0) continue;
-                    all.push(v);
-                }
-            } catch (e) { /* skip */ }
-        }
+        var kw = encodeURIComponent(String(key || '').trim());
+        if (!kw) return JSON.stringify({ list: [], page: parseInt(pg), pagecount: 1, total: 0 });
+        var resp = http(rule.host + '/cn/search/' + kw + '--.html', { headers: rule.headers, async: false });
+        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
+        var list = parseList(resp.content);
         return JSON.stringify({
-            list: all,
+            list: list,
             page: parseInt(pg),
-            pagecount: 1,
-            total: all.length
+            pagecount: list.length > 0 ? 1 : 0,
+            total: list.length
         });
     } catch (e) {
         return JSON.stringify({ list: [], error: String(e) });
