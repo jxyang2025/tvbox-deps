@@ -165,7 +165,9 @@ function detail(ids) {
             vod_remarks: isTv ? '共' + codes.length + '集' : '',
             vod_content: '',
             vod_play_from: 'PPnix',
-            vod_play_url: episodes.join('$$$')
+            // 协议：$$$ = 线路分隔，同一线路内多集用 # 分隔（每集 名称$URL）
+            // 若误用 $$$ 连每集，播放页每集变独立线路 → 只显示第一集
+            vod_play_url: episodes.join('#')
         };
         return JSON.stringify({ list: [vod] });
     } catch (e) {
