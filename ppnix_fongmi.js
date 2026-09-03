@@ -1,4 +1,4 @@
-// PPnix 影视 — FongMi/TV 原生 Spider（v6 真实搜索版）
+// PPnix 影视 — FongMi/TV 原生 Spider（v8 详情元数据版）
 // 修复要点：
 //   1. 分页 URL：page N → /cn/{tid}/---{N-1}-.html（/cn/{tid}/N.html 是详情页！）
 //   2. parseList 同时处理 /cn/movie/ 和 /cn/tv/ 卡片
@@ -134,11 +134,31 @@ function detail(ids) {
         var nm = body.match(/<h1[^>]*class="[^"]*product-title[^"]*"[^>]*>([^<]+)<\/h1>/);
         if (!nm) nm = body.match(/<title>([^<]+)<\/title>/);
         var name = nm ? nm[1].trim().split('-')[0].trim() : ('影片' + id);
+        // 标题尾部可能带 (2026) 年份，剥掉并入 year
+        var year = '';
+        var ym = name.match(/\((\d{4})\)\s*$/);
+        if (ym) {
+            year = ym[1];
+            name = name.replace(/\s*\(\d{4}\)\s*$/, '');
+        }
         // 封面
         var pm = body.match(/<img[^>]*class="[^"]*thumb[^"]*"[^>]*src="([^"]+)"/);
         if (!pm) pm = body.match(/<img[^>]*src="([^"]+)"[^>]*class="[^"]*thumb[^"]*"/);
         var pic = pm ? pm[1] : '';
-        // 播放列表：解析 m3u8=[...]（引号内取值）
+        // v8 详情元数据：导演/主演/类型/国家/又名/简介 来自 product-excerpt 块
+        // 每块形如：导演：<span><a ...>蒋继正</a></span>  或  简介：<span>纯文本</span>
+        function exText(label) {
+            var m = body.match(new RegExp('<div class="product-excerpt">' + label + '：<span>([\\s\\S]*?)</span></div>'));
+            if (!m) return '';
+            var t = m[1].replace(/<a[^>]*>/g, '').replace(/<\/a>/g, '').replace(/<[^>]+>/g, '');
+            return t.replace(/^\s+|\s+$/g, '');
+        }
+        var director = exText('导演');
+        var actor = exText('主演');
+        var tag = exText('类型');
+        var area = exText('国家');
+        var remark = exText('又名');
+        var content = exText('简介');
         var codes = [];
         var sm = body.match(/m3u8=\[([^\]]*)\]/);
         if (sm) {
@@ -160,10 +180,13 @@ function detail(ids) {
             vod_id: id,
             vod_name: name,
             vod_pic: pic,
-            vod_year: '',
-            vod_area: '',
-            vod_remarks: isTv ? '共' + codes.length + '集' : '',
-            vod_content: '',
+            vod_year: year,
+            vod_area: area,
+            vod_remarks: remark || (isTv ? '全' + codes.length + '集' : ''),
+            vod_director: director,
+            vod_actor: actor,
+            vod_tag: tag,
+            vod_content: content,
             vod_play_from: 'PPnix',
             // 协议：$$$ = 线路分隔，同一线路内多集用 # 分隔（每集 名称$URL）
             // 若误用 $$$ 连每集，播放页每集变独立线路 → 只显示第一集
