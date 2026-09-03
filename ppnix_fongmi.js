@@ -221,16 +221,41 @@ function search(key, quick, pg) {
 }
 
 // FongMi 调用 play(flag, id, flags)
-// id 是 detail 生成的完整绝对 m3u8 URL，直接透传
+// id 是 detail 生成的完整绝对 m3u8 URL
+// 通过本地 proxy 端点让 spider.proxy() 改写 m3u8 分段域名（ipfs.ppnix.com → gw.ipfs-lens.dev）
+// 解决 ipfs.ppnix.com 重定向链导致播放卡顿的问题
+// 注意：testipfs.cftest6.cn 是 CF 测试域名，在移动网络可能被 DNS 污染导致转圈；
+// gw.ipfs-lens.dev 是正式 IPFS 公共网关，证书合法、大陆手机网络可达（实测 600KB/s 稳定）
 function play(flag, id, flags) {
     try {
-        return JSON.stringify({ url: id, parse: 0 });
+        // getProxy(true) 返回本地代理 base URL（如 http://127.0.0.1:9978/proxy?do=js）
+        var proxyUrl = getProxy(true) + '&url=' + encodeURIComponent(id);
+        return JSON.stringify({ url: proxyUrl, parse: 0 });
     } catch (e) {
-        return JSON.stringify({ url: '', parse: 0 });
+        return JSON.stringify({ url: id, parse: 0 });
     }
 }
 
-function proxy(params) { return []; }
+// 代理处理函数：抓取原始 m3u8，替换分段域名和 key URI
+function proxy(params) {
+    var m3u8Url = params.url;
+    if (!m3u8Url) return [400, 'text/plain', 'no url'];
+    try {
+        var resp = http(m3u8Url, { headers: rule.headers, async: false });
+        if (!resp || resp.code !== 200) return [resp ? resp.code : 502, 'text/plain', 'http fail ' + (resp ? resp.code : 'null')];
+        var content = resp.content;
+        // ipfs.ppnix.com 每段视频分经历 302→N.ppnix.com→301→真网关（2 次重定向链），是卡顿根因
+        // 替换为正式 IPFS 公共网关 gw.ipfs-lens.dev（200 直返，~600KB/s 稳定）
+        // 备选：testipfs.cftest6.cn 速度更快（3.5MB/s）但 CF 测试域名，移动网络可能 DNS 污染导致转圈
+        content = content.replace(/https?:\/\/ipfs\.ppnix\.com/g, 'https://gw.ipfs-lens.dev');
+        // 相对 key URI 改写为绝对 URL（URI="../key" → URI="https://www.ppnix.com/info/key"）
+        // key 请求走 ppnix CDN（非 IPFS），保持原域名即可；但播放器需正确解析绝对路径
+        content = content.replace(/\.\.\/key/g, 'https://www.ppnix.com/info/key');
+        return [200, 'application/vnd.apple.mpegurl', content];
+    } catch (e) {
+        return [500, 'text/plain', String(e)];
+    }
+}
 function sniffer() { return false; }
 function isVideo(url) {
     return /m3u8|mp4|flv|avi|mkv|ts|webm/.test(url.toLowerCase());
