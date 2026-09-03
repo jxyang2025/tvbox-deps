@@ -1,7 +1,9 @@
-// PPnix 影视 — FongMi/TV 原生 Spider
-// 自包含，零外部依赖
-// 仅使用 export default（不用 globalThis.__JS_SPIDER__，避免被 content.replace 破坏）
-// 直接使用 FongMi/TV 内置的 req()（来自 http.js，同步返回含 .string/.headers/.code）
+// PPnix 影视 — FongMi/TV 原生 Spider（v2 修正版）
+// 修正：resp.content（Connect.java success() 字段名 content，非 string）
+// 修正：加 init / homeVod（FongMi 必调，缺函数返回 null 但稳妥起见补全）
+// 修正：detail 兼容字符串和数组（FongMi 传 ids.get(0) 字符串）
+// 修正：home 返回 class 字段（FongMi 首页靠 class 渲染分类栏）
+// 依赖：仅用 http()（FongMi/TV http.js 的 function 声明，全局可访问）
 
 var rule = {
     title: 'PPnix影视',
@@ -17,17 +19,19 @@ var rule = {
     changeable: 0,
     timeout: 15000,
     headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36'
     }
 };
 
-// req / http 由 FongMi/TV 的 http.js 全局提供，无需重复定义
+// http(url, {headers, async: false}) → JSObject {code, headers, content}
+// resp.code: HTTP 状态码（200/404/...）
+// resp.content: 响应体字符串（默认 buffer=0）
+// resp.headers: JSObject 含响应头
 
-// 解析列表页 — 返回 vod 数组
 function parseList(html) {
     var list = [];
     var seen = {};
-    // 匹配 <a href="/cn/movie/ID.html" ... title="NAME" ...><img src="PIC" ...></a>
+    // 匹配：<a href="/cn/movie/ID.html" ... title="NAME" ...><img src="PIC" ...></a>
     var re = /<a[^>]*href="\/cn\/movie\/(\d+)\.html"[^>]*(?:title="([^"]*)")?[^>]*>/gi;
     var m;
     while ((m = re.exec(html)) !== null) {
@@ -35,8 +39,7 @@ function parseList(html) {
         if (seen[id]) continue;
         seen[id] = 1;
         var name = m[2] ? m[2].trim() : '';
-        // 取图片（在链接后 600 字符内找 img）
-        var seg = html.substring(m.index, m.index + 600);
+        var seg = html.substring(m.index, Math.min(m.index + 600, html.length));
         var picM = seg.match(/<img[^>]*src="([^"]*)"[^>]*>/);
         var pic = picM ? picM[1] : '';
         if (!name) {
@@ -49,35 +52,61 @@ function parseList(html) {
     return list;
 }
 
+function init(ext) {
+    return '';
+}
+
 function home(filter) {
     try {
-        var html = req(rule.host + rule.homeUrl, { 'User-Agent': rule.headers['User-Agent'] });
-        var body = (html && html.string) ? html.string : String(html);
-        var list = parseList(body);
+        var resp = http(rule.host + rule.homeUrl, { headers: rule.headers, async: false });
+        if (resp.code !== 200) throw 'HTTP ' + resp.code;
+        var list = parseList(resp.content);
+        // class 必填：FongMi 首页靠 class 渲染分类选择栏
+        var cls = rule.class_name.split('&').map(function(name, i) {
+            return { type_id: rule.class_url.split('&')[i], type_name: name };
+        });
+        return JSON.stringify({ class: cls, list: list });
+    } catch (e) {
+        return JSON.stringify({ class: [], list: [], error: String(e) });
+    }
+}
+
+function homeVod() {
+    try {
+        var resp = http(rule.host + rule.homeUrl, { headers: rule.headers, async: false });
+        if (resp.code !== 200) throw 'HTTP ' + resp.code;
+        var list = parseList(resp.content).slice(0, 10);
         return JSON.stringify({ list: list });
     } catch (e) {
-        return JSON.stringify({ list: [], error: String(e) });
+        return JSON.stringify({ list: [] });
     }
 }
 
 function category(tid, pg, filter, ext) {
-    if (pg <= 0) pg = 1;
+    if (!pg || pg <= 0) pg = 1;
     try {
         var url = rule.host + rule.url.replace('fyclass', tid).replace('fypage', '' + pg);
-        var html = req(url, { 'User-Agent': rule.headers['User-Agent'] });
-        var body = (html && html.string) ? html.string : String(html);
-        var list = parseList(body);
-        return JSON.stringify({ list: list, page: parseInt(pg), pagecount: 999, total: list.length });
+        var resp = http(url, { headers: rule.headers, async: false });
+        if (resp.code !== 200) throw 'HTTP ' + resp.code;
+        var list = parseList(resp.content);
+        return JSON.stringify({
+            list: list,
+            page: parseInt(pg),
+            pagecount: 999,
+            total: list.length
+        });
     } catch (e) {
         return JSON.stringify({ list: [], error: String(e) });
     }
 }
 
+// FongMi 调用 detail(ids.get(0)) 传字符串，不是数组
 function detail(ids) {
     try {
-        var id = ids[0];
-        var html = req(rule.host + '/cn/movie/' + id + '.html', { 'User-Agent': rule.headers['User-Agent'] });
-        var body = (html && html.string) ? html.string : String(html);
+        var id = (typeof ids === 'string') ? ids : (ids[0] || '');
+        var resp = http(rule.host + '/cn/movie/' + id + '.html', { headers: rule.headers, async: false });
+        if (resp.code !== 200) throw 'HTTP ' + resp.code;
+        var body = resp.content;
         var name = '';
         var pic = '';
         var nm = body.match(/<h1[^>]*class="[^"]*product-title[^"]*"[^>]*>([^<]+)<\/h1>/);
@@ -87,7 +116,6 @@ function detail(ids) {
         if (!pm) pm = body.match(/<img[^>]*src="([^"]*)"[^>]*class="[^"]*thumb[^"]*"/);
         pic = pm ? pm[1] : '';
 
-        // 提取播放集数（data-quality 或 /info/m3u8/ID/QUALITY.m3u8）
         var eps = [];
         var seen = {};
         var qre = /data-quality="([^"]+)"/g;
@@ -119,7 +147,7 @@ function detail(ids) {
             }]
         });
     } catch (e) {
-        return JSON.stringify({ list: [{ vod_id: ids[0], error: String(e) }] });
+        return JSON.stringify({ list: [{ vod_id: ids, error: String(e) }] });
     }
 }
 
@@ -127,9 +155,9 @@ function search(key, quick, pg) {
     if (!pg) pg = 1;
     try {
         var url = rule.host + '/cn/?s=' + encodeURIComponent(key) + '&page=' + pg;
-        var html = req(url, { 'User-Agent': rule.headers['User-Agent'] });
-        var body = (html && html.string) ? html.string : String(html);
-        var list = parseList(body);
+        var resp = http(url, { headers: rule.headers, async: false });
+        if (resp.code !== 200) throw 'HTTP ' + resp.code;
+        var list = parseList(resp.content);
         return JSON.stringify({ list: list });
     } catch (e) {
         return JSON.stringify({ list: [], error: String(e) });
@@ -140,14 +168,29 @@ function play(flag, id, flags) {
     return JSON.stringify({ url: id, parse: 0 });
 }
 
+function proxy(params) {
+    return JSON.stringify([]);
+}
+
+function sniffer() {
+    return 'false';
+}
+
+function isVideo(url) {
+    return /m3u8|mp4|flv|avi|mkv/.test(url.toLowerCase());
+}
+
 var spiderObj = {
+    init: init,
     home: home,
+    homeVod: homeVod,
     category: category,
     detail: detail,
     search: search,
-    play: play
+    play: play,
+    proxy: proxy,
+    sniffer: sniffer,
+    isVideo: isVideo
 };
 
-// 只导出 default，不手动设置 globalThis.__JS_SPIDER__
-// （FongMi 的 content.replace 会破坏 globalThis.__JS_SPIDER__ 赋值）
 export default spiderObj;
