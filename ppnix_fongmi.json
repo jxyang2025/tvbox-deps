@@ -1,8 +1,8 @@
 {
   "sites": [
     {
-      "key": "PPnix",
-      "name": "PPnix影视(FongMi原生)",
+      "key": "PPnix2",
+      "name": "PPnix影视",
       "type": 3,
       "api": "https://raw.githubusercontent.com/jxyang2025/tvbox-deps/main/ppnix_fongmi.js",
       "searchable": 1,
