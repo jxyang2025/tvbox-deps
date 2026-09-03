@@ -17,8 +17,8 @@ var rule = {
     url: '/cn/fyclass/---fypage--.html',
     class_name: '电影&电视剧',
     class_url: 'movie&tv',
-    searchable: 2,
-    quickSearch: 0,
+    searchable: 1,
+    quickSearch: 1,
     filterable: 0,
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
