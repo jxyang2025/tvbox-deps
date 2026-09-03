@@ -112,12 +112,24 @@ function category(tid, pg, filter, ext) {
 }
 
 // FongMi 调用 detail(ids.get(0)) 传单个字符串，不是数组
+// ppnix 详情页播放列表藏在 <script>m3u8=['1080P']</script>（电影=清晰度，剧集=集数编号）
+// 真实播放 URL = https://www.ppnix.com/info/m3u8/{id}/{code}.m3u8
 function detail(ids) {
     try {
         var id = (typeof ids === 'string') ? ids : (ids[0] || '');
-        var resp = http(rule.host + '/cn/movie/' + id + '.html', { headers: rule.headers, async: false });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
-        var body = resp.content;
+        if (!/^\d+$/.test(id)) return JSON.stringify({ list: [] });
+        var body = null, pageUrl = '';
+        // 电影/剧集 id 空间不同：先试 movie，失败再试 tv
+        var tries = ['/cn/movie/' + id + '.html', '/cn/tv/' + id + '.html'];
+        for (var ti = 0; ti < tries.length; ti++) {
+            var resp = http(rule.host + tries[ti], { headers: rule.headers, async: false });
+            if (resp && resp.code === 200 && resp.content && /infoid=\d+/.test(resp.content)) {
+                body = resp.content;
+                pageUrl = tries[ti];
+                break;
+            }
+        }
+        if (!body) throw 'detail page not found for ' + id;
         // 标题
         var nm = body.match(/<h1[^>]*class="[^"]*product-title[^"]*"[^>]*>([^<]+)<\/h1>/);
         if (!nm) nm = body.match(/<title>([^<]+)<\/title>/);
@@ -126,36 +138,23 @@ function detail(ids) {
         var pm = body.match(/<img[^>]*class="[^"]*thumb[^"]*"[^>]*src="([^"]+)"/);
         if (!pm) pm = body.match(/<img[^>]*src="([^"]+)"[^>]*class="[^"]*thumb[^"]*"/);
         var pic = pm ? pm[1] : '';
-        // 播放源 + 集数
-        var eps = [];
-        var seen = {};
-        var qre = /data-quality="([^"]+)"/g;
-        var qm;
-        while ((qm = qre.exec(body)) !== null) {
-            var q = qm[1].trim();
-            if (!seen[q]) { seen[q] = 1; eps.push(q); }
-        }
-        if (eps.length === 0) {
-            var m3re = /\/info\/m3u8\/(\d+)\/(\d+\.m3u8)/g;
-            var mm;
-            while ((mm = m3re.exec(body)) !== null) {
-                var key = mm[0];
-                if (!seen[key]) { seen[key] = 1; eps.push(mm[0]); }
+        // 播放列表：解析 m3u8=[...]（引号内取值）
+        var codes = [];
+        var sm = body.match(/m3u8=\[([^\]]*)\]/);
+        if (sm) {
+            var qre = /'([^']*)'/g, qm;
+            while ((qm = qre.exec(sm[1])) !== null) {
+                var c = qm[1].trim();
+                if (c) codes.push(c);
             }
         }
-        if (eps.length === 0) eps.push(id);
+        if (codes.length === 0) codes.push('1080P'); // 兜底：默认清晰度
+        var isTv = pageUrl.indexOf('/tv/') >= 0;
         var episodes = [];
-        for (var ei = 0; ei < eps.length; ei++) {
-            var ep = eps[ei];
-            var flag = ep;
-            if (flag.indexOf('/info/m3u8/') >= 0) {
-                var parts = ep.split('/');
-                var num = parts[parts.length - 2];
-                flag = '第' + num + '集';
-            } else {
-                flag = '默认';
-            }
-            episodes.push(flag + '$' + ep);
+        for (var ei = 0; ei < codes.length; ei++) {
+            var code = codes[ei];
+            var label = /^\d+$/.test(code) ? '第' + code + '集' : code;
+            episodes.push(label + '$https://www.ppnix.com/info/m3u8/' + id + '/' + code + '.m3u8');
         }
         var vod = {
             vod_id: id,
@@ -163,9 +162,9 @@ function detail(ids) {
             vod_pic: pic,
             vod_year: '',
             vod_area: '',
-            vod_remarks: '',
+            vod_remarks: isTv ? '共' + codes.length + '集' : '',
             vod_content: '',
-            vod_play_from: eps.join('$$$'),
+            vod_play_from: 'PPnix',
             vod_play_url: episodes.join('$$$')
         };
         return JSON.stringify({ list: [vod] });
