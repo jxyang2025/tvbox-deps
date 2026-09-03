@@ -226,9 +226,8 @@ function search(key, quick, pg) {
 // 解决 ipfs.ppnix.com 网关慢导致播放卡顿的问题
 function play(flag, id, flags) {
     try {
-        // getProxy(true) 返回本地代理 base URL（如 http://127.0.0.1:9978/proxy）
-        // 用 proxy://?do=js 前缀让 player 识别并转发
-        var proxyUrl = 'proxy://?do=js&url=' + encodeURIComponent(id);
+        // getProxy(true) 返回本地代理 base URL（如 http://127.0.0.1:9978/proxy?do=js）
+        var proxyUrl = getProxy(true) + '&url=' + encodeURIComponent(id);
         return JSON.stringify({ url: proxyUrl, parse: 0 });
     } catch (e) {
         return JSON.stringify({ url: id, parse: 0 });
