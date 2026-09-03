@@ -4,7 +4,7 @@
       "key": "PPnix",
       "name": "PPnix影视(FongMi原生)",
       "type": 3,
-      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/ppnix_fongmi.js",
+      "api": "https://raw.githubusercontent.com/jxyang2025/tvbox-deps/main/ppnix_fongmi.js",
       "searchable": 2,
       "quickSearch": 0,
       "filterable": 0,
