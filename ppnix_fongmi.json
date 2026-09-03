@@ -5,10 +5,10 @@
       "name": "PPnix影视(FongMi原生)",
       "type": 3,
       "api": "https://raw.githubusercontent.com/jxyang2025/tvbox-deps/main/ppnix_fongmi.js",
-      "searchable": 2,
-      "quickSearch": 0,
+      "searchable": 1,
+      "quickSearch": 1,
       "filterable": 0,
-      "changeable": 0,
+      "changeable": 1,
       "timeout": 15000
     }
   ]
