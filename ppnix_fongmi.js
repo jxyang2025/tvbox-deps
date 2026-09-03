@@ -221,39 +221,16 @@ function search(key, quick, pg) {
 }
 
 // FongMi 调用 play(flag, id, flags)
-// id 是 detail 生成的完整绝对 m3u8 URL
-// 通过本地 proxy 端点让 spider.proxy() 改写 m3u8 分段域名（ipfs.ppnix.com → testipfs.cftest6.cn）
-// 解决 ipfs.ppnix.com 网关慢导致播放卡顿的问题
+// id 是 detail 生成的完整绝对 m3u8 URL，直接透传
 function play(flag, id, flags) {
     try {
-        // getProxy(true) 返回本地代理 base URL（如 http://127.0.0.1:9978/proxy?do=js）
-        var proxyUrl = getProxy(true) + '&url=' + encodeURIComponent(id);
-        return JSON.stringify({ url: proxyUrl, parse: 0 });
-    } catch (e) {
         return JSON.stringify({ url: id, parse: 0 });
+    } catch (e) {
+        return JSON.stringify({ url: '', parse: 0 });
     }
 }
 
-// 代理处理函数：抓取原始 m3u8，替换分段域名和 key URI
-function proxy(params) {
-    var m3u8Url = params.url;
-    if (!m3u8Url) return [400, 'text/plain', 'no url'];
-    try {
-        var resp = http(m3u8Url, { headers: rule.headers, async: false });
-        if (!resp || resp.code !== 200) return [resp ? resp.code : 502, 'text/plain', 'http fail ' + (resp ? resp.code : 'null')];
-        var content = resp.content;
-        // 替换慢 IPFS 网关为已验证的高速直连网关（0.4-1.1s/段，约 3-7MB/s）
-        // ipfs.ppnix.com 测速 26KB/s~753KB/s 波动大，testipfs.cftest6.cn 稳定快 40+ 倍
-        content = content.replace(/https:\/\/ipfs\.ppnix\.com/g, 'https://testipfs.cftest6.cn');
-        // 相对 key URI 改写为绝对 URL（避免播放器用 proxy URL 为基准解析错误）
-        content = content.replace(/URI="\.\/key"/g, 'URI="https://www.ppnix.com/info/key"');
-        content = content.replace(/URI='\.\.\/key'/g, "URI='https://www.ppnix.com/info/key'");
-        content = content.replace(/\.\.\/key/g, 'https://www.ppnix.com/info/key');
-        return [200, 'application/vnd.apple.mpegurl', content];
-    } catch (e) {
-        return [500, 'text/plain', String(e)];
-    }
-}
+function proxy(params) { return []; }
 function sniffer() { return false; }
 function isVideo(url) {
     return /m3u8|mp4|flv|avi|mkv|ts|webm/.test(url.toLowerCase());
