@@ -201,16 +201,10 @@ function search(key, quick, pg) {
 }
 
 // FongMi 调用 play(flag, id, flags)
-// id 可能是 /info/m3u8/xxx/yyy.m3u8 或直接用 detail id
+// id 是 detail 生成的完整绝对 m3u8 URL，直接透传
 function play(flag, id, flags) {
     try {
-        // 若 id 是 m3u8 链接（含 /info/m3u8/），直接返回；否则尝试构建
-        var url = id;
-        if (url.indexOf('/info/m3u8/') < 0 && url.indexOf('m3u8') < 0) {
-            // 默认尝试构造，但 ppnix 播放需进一步分析
-            // 暂时直接返回，让 FongMi 尝试播放
-        }
-        return JSON.stringify({ url: url, parse: 0, header: { 'User-Agent': rule.headers['User-Agent'] } });
+        return JSON.stringify({ url: id, parse: 0 });
     } catch (e) {
         return JSON.stringify({ url: '', parse: 0 });
     }
