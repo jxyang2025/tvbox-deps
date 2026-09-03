@@ -1,10 +1,1 @@
-{
-  "urls": [
-    {
-      "name": "PPnix影视",
-      "t": 1,
-      "key": "ppnix",
-      "rule": "var rule = {\n\"title\": \"PPnix\",\n\"host\": \"https://www.ppnix.com\",\n\"homeUrl\": \"/cn/movie/\",\n\"url\": \"/cn/fyclass/\",\n\"class_name\": \"电影&电视剧\",\n\"class_url\": \"movie&tv\",\n\"searchable\": 2,\n\"搜索\": \"*\",\n\"playparse\": 0,\n\"parse_url\": \"\",\n\"class_parse\": false,\n\"fl\": true,\n\"filterable\": 0,\n\"cate_exclude\": \"\",\n\"header\": {\n\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\",\n\"Referer\": \"https://www.ppnix.com/\"\n},\n\"latcharset\": \"utf-8\",\n\"tab_rename\": {\n\"电影\": \"电影\",\n\"电视剧\": \"电视剧\"\n},\n\"limit\": 20,\n\"timeout\": 10,\n\"多级\": \"1\",\n\"play_json\": [],\n\"cate_excludes\": [\n\"今日更新\"\n],\n\"多级分类\": \"1\",\n\"二级\": \"js:var html=request(input);var m=html.match(/classid=(\\\\d+);classurl='([^']+?)';infoid=(\\\\d+);sub='([^']+?)';m3u8=(\\\\[.*?\\\\])/);var cid=m?m[1]:'';var cpage=(m&&m[2])||input;var pn='';var ppic='';var pd='';var StUrl3='m3u8=[\\\\''+m[1]+'\\\\']';m=html.match(eval(StUrl3));var qname=m?m[0].match(/m3u8=\\\\['([^']+)'/)[1]:'';var m3u8Url='https://www.ppnix.com/info/m3u8/'+cid+'/'+qname+'.m3u8';var vod={vod_id:cid,vod_name:'',vod_pic:'',vod_year:'',vod_content:'',vod_play_from:'PPnix',vod_play_url:''};vod.vod_pic=ppic||vod.vod_pic;vod.vod_year=pn||vod.vod_year;vod.vod_content=pd||vod.vod_content;vod.vod_play_url=vod.vod_play_url+pn+'$'+m3u8Url;result=JSON.stringify(vod);\",\n\"lazy\": \"js:var m3u8=request(input);var keyUrl='https://www.ppnix.com/info/m3u8/key';m3u8=m3u8.replace(/\\\\.\\\\.\\\\/key/g,keyUrl);m3u8=m3u8.replace(/https:\\\\/\\\\/ipfs\\\\.ppnix\\\\.com\\\\/ipfs\\\\//g,'https://walkah.cloud/ipfs/');input={parse:1,url:m3u8};\"\n}"
-    }
-  ]
-}
+{"sites": [{"key": "PPnix", "name": "PPnix影视", "type": 3, "api": "https://gh.927223.xyz/https://raw.githubusercontent.com/qist/tvbox/master/FTY/drpy2.min.js", "ext": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/ppnix_drpy.js?v=20260903", "searchable": 2, "quickSearch": 0, "filterable": 0, "changeable": 0, "timeout": 15000}]}
