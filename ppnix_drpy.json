@@ -1,7 +1,10 @@
 {
-  "name": "PPnix",
-  "type": 1,
-  "api": "./ppnix_drpy.js",
+  "key": "PPnix",
+  "name": "PPnix|影视",
+  "type": 3,
+  "api": "./drpy2.min.js",
+  "ext": "./ppnix_drpy.js",
   "searchable": 2,
-  "filterable": 0
+  "filterable": 0,
+  "changeable": 0
 }
