@@ -89,7 +89,7 @@ function home(filter) {
         ];
         return JSON.stringify({ class: cls, list: items });
     } catch (e) {
-        return JSON.stringify({ class: [], list: [], error: '❌ 剧OK 首页加载失败' });
+        return JSON.stringify({ class: [], list: [{ vod_id: 'err_home', vod_name: '❌ 首页加载失败: ' + e, vod_pic: '', vod_remarks: '检查网络或域名' }] });
     }
 }
 
@@ -100,7 +100,7 @@ function homeVod() {
         var items = pairItems(resp.content).slice(0, 12);
         return JSON.stringify({ list: items });
     } catch (e) {
-        return JSON.stringify({ list: [] });
+        return JSON.stringify({ list: [{ vod_id: 'err_vod', vod_name: '❌ homeVod失败: ' + e, vod_pic: '', vod_remarks: '' }] });
     }
 }
 
@@ -120,7 +120,7 @@ function category(tid, pg, filter, ext) {
             total: filtered.length
         });
     } catch (e) {
-        return JSON.stringify({ list: [], error: '❌ 剧OK 类别加载失败: ' + e });
+        return JSON.stringify({ list: [{ vod_id: 'err_cat', vod_name: '❌ 分类加载失败: ' + e, vod_pic: '', vod_remarks: tid }] });
     }
 }
 
@@ -173,14 +173,14 @@ function detail(ids) {
             }
         }
         if (eps.length === 0) {
-            return JSON.stringify({ list: [], error: '❌ 剧OK 未找到播放源' });
+            return JSON.stringify({ list: [{ vod_id: id, vod_name: '❌ 未找到播放源', vod_pic: '', vod_content: name }] });
         }
         return JSON.stringify({ list: [{
             vod_id: id, vod_name: name, vod_pic: pic, vod_content: content,
             vod_play_from: '剧OK', vod_play_url: eps.join('#')
         }] });
     } catch (e) {
-        return JSON.stringify({ list: [], error: '❌ 剧OK 详情失败: ' + e });
+        return JSON.stringify({ list: [{ vod_id: 'err_det', vod_name: '❌ 详情加载失败: ' + e, vod_pic: '', vod_remarks: id }] });
     }
 }
 
@@ -195,7 +195,7 @@ function search(key, quick, pg) {
         var items = pairItems(resp.content);
         return JSON.stringify({ list: items, page: parseInt(pg), pagecount: 999, total: items.length });
     } catch (e) {
-        return JSON.stringify({ list: [], error: '❌ 剧OK 搜索失败: ' + e });
+        return JSON.stringify({ list: [{ vod_id: 'err_search', vod_name: '❌ 搜索失败: ' + e, vod_pic: '', vod_remarks: key }] });
     }
 }
 
