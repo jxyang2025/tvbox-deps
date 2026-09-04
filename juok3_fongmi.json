@@ -4,11 +4,10 @@
       "key": "juok3",
       "name": "剧OK",
       "type": 3,
-      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/drpy2.min.js",
-      "ext": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
+      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_native.js",
       "searchable": 1,
       "quickSearch": 1,
-      "filterable": 1
+      "filterable": 0
     }
   ]
 }
