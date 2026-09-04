@@ -1,22 +1,14 @@
 {
-  "spider": "",
-  "wallpaper": "https://bing.img.run/rand.php",
-  "lives": [
-    {
-      "name": "剧OK",
-      "type": 0,
-      "url": "https://juok3.top/"
+    "key": "juok3",
+    "name": "剧OK",
+    "type": 3,
+    "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
+    "ext": "",
+    "searchable": 1,
+    "quickSearch": 1,
+    "filterable": 0,
+    "style": {
+        "type": "rect",
+        "ratio": 0.7
     }
-  ],
-  "sites": [
-    {
-      "key": "juok3",
-      "name": "剧OK[js]",
-      "type": 3,
-      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
-      "searchable": 1,
-      "quickSearch": 1,
-      "filterable": 0
-    }
-  ]
 }
