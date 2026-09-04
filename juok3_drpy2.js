@@ -1,5 +1,6 @@
-// 剧OK (juok3.top) — FongMi/TV 原生 spider v13
-// 格式：FongMi native spider (spiderObj, http(), resp.content)
+// 剧OK (juok3.top) — FongMi/TV 原生 spider v14
+// 严格遵循 FongMi SPIDER.md 函数命名规范
+// QuickJS export default spiderObj
 // AppleCMS v10 短剧站
 // 2026-09-04
 
@@ -21,14 +22,12 @@ var rule = {
 
 // 从HTML或markdown中解析列表
 // FongMi http() 返回原始HTML；web_extract缓存为markdown
-// 匹配多种格式：HTML (AppleCMS v10) 和 markdown
 function parseList(body) {
     var list = [];
     var seen = {};
     if (!body) return list;
 
-    // 格式1: AppleCMS v10 标准HTML模板
-    // <a href="/detail/{id}/{uid}" title="NAME"><img src="pic" /><em>集数</em></a>
+    // 格式1: AppleCMS v10 标准HTML
     var htmlRe = /<a[^>]*href=["']\/detail\/(\d+)\/([A-Za-z0-9]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
     var m;
     while ((m = htmlRe.exec(body)) !== null) {
@@ -48,17 +47,16 @@ function parseList(body) {
         if (list.length >= 30) break;
     }
 
-    // 格式2: markdown格式 (web_extract转换后 / drpy2 fetch)
-    // [![alt](pic)\n集数\n\n**title**](https://juok3.top/detail/X/uid)
+    // 格式2: markdown格式 (drpy2/fetch返回)
     if (list.length === 0) {
         var mdRe = /\[!\[([^\]]*)\]\((https?:\/\/[^)]+)\)[\s\S]*?\]\((https?:\/\/[^)]+)\)/gi;
         while ((m = mdRe.exec(body)) !== null) {
             var name2 = m[1].trim();
             var pic2 = m[2];
             var url2 = m[3];
-            var uidM = url2.match(/\/detail\/\d+\/([A-Za-z0-9]+)$/);
+            var uidM = url2.match(/\/detail\/(\d+)\/([A-Za-z0-9]+)$/);
             if (!uidM) continue;
-            var uid2 = uidM[1];
+            var uid2 = uidM[2];
             if (!name2 || name2.length < 2) continue;
             if (!seen[uid2]) {
                 seen[uid2] = 1;
@@ -68,18 +66,18 @@ function parseList(body) {
         }
     }
 
-    // 格式3: 更宽松的markdown配对 (图片+detail链接分开)
+    // 格式3: 宽松配对
     if (list.length === 0) {
         var imgs = body.match(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g) || [];
         var details = body.match(/\[([^\]]+)\]\((https?:\/\/[^)]+\/detail\/\d+\/[A-Za-z0-9]+)\)/g) || [];
         var cnt = Math.min(imgs.length, details.length, 30);
         for (var i = 0; i < cnt; i++) {
             var imgM = imgs[i].match(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/);
-            var detM = details[i].match(/\[([^\]]+)\]\((https?:\/\/[^)]+\/detail\/\d+\/([A-Za-z0-9]+))\)/);
+            var detM = details[i].match(/\[([^\]]+)\]\((https?:\/\/[^)]+\/detail\/(\d+)\/([A-Za-z0-9]+))\)/);
             if (imgM && detM) {
                 var name3 = imgM[1].trim() || detM[1].trim();
                 var pic3 = imgM[2];
-                var uid3 = detM[2];
+                var uid3 = detM[3];
                 if (name3.length > 1 && !seen[uid3]) {
                     seen[uid3] = 1;
                     list.push({ vod_id: uid3, vod_name: name3, vod_pic: pic3, vod_remarks: '' });
@@ -95,7 +93,8 @@ function init(ext) {
     return '';
 }
 
-function home(filter) {
+// SPIDER.md: homeContent(filter)
+function homeContent(filter) {
     try {
         var resp = http(rule.host, { headers: rule.headers, async: false });
         if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
@@ -105,11 +104,12 @@ function home(filter) {
         });
         return JSON.stringify({ class: cls, list: list });
     } catch (e) {
-        return JSON.stringify({ class: [], list: [], error: String(e) });
+        return JSON.stringify({ class: [], list: [] });
     }
 }
 
-function homeVod() {
+// SPIDER.md: homeVideoContent()
+function homeVideoContent() {
     try {
         var resp = http(rule.host, { headers: rule.headers, async: false });
         if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
@@ -120,15 +120,14 @@ function homeVod() {
     }
 }
 
-function category(tid, pg, filter, ext) {
-    if (!pg || parseInt(pg) <= 0) pg = 1;
+// SPIDER.md: categoryContent(tid, pg, filter, extend)
+function categoryContent(tid, pg, filter, extend) {
+    if (!pg || parseInt(pg) <= 0) pg = '1';
     try {
-        // AppleCMS v10 分类页: /category/{type}/page/{page}.html
-        // 也尝试 /search?q={name} 作为备选
         var clsMap = { 'movie': '电影', 'tv': '电视剧', 'variety': '综艺', 'anime': '动漫' };
         var clsName = clsMap[tid] || tid;
         var urlPath = '/category/' + tid;
-        if (pg > 1) urlPath += '/page/' + pg + '.html';
+        if (parseInt(pg) > 1) urlPath += '/page/' + pg + '.html';
 
         var resp = http(rule.host + urlPath, { headers: rule.headers, async: false });
         var list = [];
@@ -136,10 +135,10 @@ function category(tid, pg, filter, ext) {
             list = parseList(resp.content);
         }
 
-        // 备选：如果分类页为空，尝试搜索页
+        // 备选：搜索页
         if (list.length === 0) {
             var searchUrl = rule.host + '/search?q=' + encodeURIComponent(clsName);
-            if (pg > 1) searchUrl += '&page=' + pg;
+            if (parseInt(pg) > 1) searchUrl += '&page=' + pg;
             var resp2 = http(searchUrl, { headers: rule.headers, async: false });
             if (resp2 && resp2.code === 200) {
                 list = parseList(resp2.content);
@@ -153,23 +152,24 @@ function category(tid, pg, filter, ext) {
             total: list.length
         });
     } catch (e) {
-        return JSON.stringify({ list: [], error: String(e), page: 1, pagecount: 1, total: 0 });
+        return JSON.stringify({ list: [], page: 1, pagecount: 1, total: 0 });
     }
 }
 
-function detail(ids) {
+// SPIDER.md: detailContent(ids)
+function detailContent(ids) {
     try {
         var id = ids || '';
         if (!id) return JSON.stringify({ list: [] });
-        // id 是 uid (如 PbZtbH7nTG8uM3)，需要找到对应的 typeId
-        // 尝试 movie=1, tv=2, variety=3, anime=4
+        // ids 可能是数组
+        if (Array.isArray(id)) id = id[0];
+
         var types = ['1', '2', '3', '4'];
         var body = null;
         for (var ti = 0; ti < types.length; ti++) {
             var url = rule.host + '/detail/' + types[ti] + '/' + id;
             var resp = http(url, { headers: rule.headers, async: false });
             if (resp && resp.code === 200 && resp.content) {
-                // 验证是否找到了正确的详情页（包含播放链接）
                 if (/play|episodes|集|vod_play/.test(resp.content)) {
                     body = resp.content;
                     break;
@@ -178,19 +178,16 @@ function detail(ids) {
         }
         if (!body) throw 'detail not found for ' + id;
 
-        // 标题
         var nm = body.match(/<title>([^<]+)<\/title>/);
         var name = nm ? nm[1].trim().split('-')[0].split('|')[0].trim() : '';
         if (!name) {
             var h1M = body.match(/<h1[^>]*>([^<]+)<\/h1>/);
             name = h1M ? h1M[1].trim() : ('影片' + id);
         }
-        // 剥离年份
         var year = '';
         var ym = name.match(/(\d{4})/);
         if (ym) year = ym[1];
 
-        // 封面
         var pm = body.match(/<img[^>]*src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp))"/i);
         var pic = pm ? pm[1] : '';
         if (!pic) {
@@ -198,7 +195,6 @@ function detail(ids) {
             pic = pm ? pm[1] : '';
         }
 
-        // 简介
         var content = '';
         var descM = body.match(/<meta[^>]*name="description"[^>]*content="(.*?)"/i);
         if (descM) content = descM[1].replace(/<[^>]+>/g, '');
@@ -207,30 +203,22 @@ function detail(ids) {
             if (introM) content = introM[1].replace(/<[^>]+>/g, '');
         }
 
-        // 演员/导演
         var actorM = body.match(/主演[：:]\s*([^<\n]+)/);
         var actor = actorM ? actorM[1].replace(/<[^>]+>/g, '').trim() : '';
         var dirM = body.match(/导演[：:]\s*([^<\n]+)/);
         var director = dirM ? dirM[1].replace(/<[^>]+>/g, '').trim() : '';
 
-        // 播放列表: 尝试从播放链接中提取
-        // AppleCMS 短剧站播放链接格式: /play/{typeId}/{uid}/{ep}.html 或 /play/{typeId}/{uid}/1?s=xxx
-        var playRe = /<a[^>]*href="\/play\/\d+\/[^"]+\/(\d+)(?:\.html)?"[^>]*>([^<]+)<\/a>/gi;
+        // 播放列表
         var playFroms = {};
+        var playRe = /<a[^>]*href="(\/play\/\d+\/[^"]+\/\d+(?:\.html)?)"[^>]*>([^<]+)<\/a>/gi;
         var pm2;
         while ((pm2 = playRe.exec(body)) !== null) {
-            var ep = pm2[1];
-            var label = pm2[2].trim() || ('第' + ep + '集');
-            var playUrl = rule.host + '/play/' + ep; // 简化，实际需要完整URL
-            // 重新匹配完整URL
-            var fullUrlM = body.match(new RegExp('<a[^>]*href="(/play/\\d+/' + id + '/' + ep + '[^"]*)"'));
-            var playUrl2 = fullUrlM ? rule.host + fullUrlM[1] : '';
-            if (!playUrl2) playUrl2 = rule.host + '/play/' + ep;
+            var label = pm2[2].trim() || ('第' + playRe.lastIndex + '集');
+            var playUrl = rule.host + pm2[1];
             if (!playFroms['默认']) playFroms['默认'] = [];
-            playFroms['默认'].push(label + '$' + playUrl2);
+            playFroms['默认'].push(label + '$' + playUrl);
         }
 
-        // 如果上面没匹配到，尝试另一种格式: /detail/{typeId}/{uid}/1.html
         if (!playFroms['默认'] || playFroms['默认'].length === 0) {
             var playRe2 = /<a[^>]*href="(\/detail\/\d+\/[^"]+\/\d+\.html)"[^>]*>([^<]+)<\/a>/gi;
             while ((pm2 = playRe2.exec(body)) !== null) {
@@ -241,17 +229,12 @@ function detail(ids) {
             }
         }
 
-        // 兜底：直接返回播放链接
         if (!playFroms['默认'] || playFroms['默认'].length === 0) {
-            // AppleCMS 短剧常用格式: /play/{typeId}/{uid}/1
-            // 详情页可能有多个播放源
             var sources = body.match(/href="(\/play\/\d+\/[^"]+\.html)"/g) || [];
             var unique = {};
             sources.forEach(function(s) {
                 var uM = s.match(/href="(\/play\/\d+\/[^"]+\.html)"/);
-                if (uM && !unique[uM[1]]) {
-                    unique[uM[1]] = 1;
-                }
+                if (uM && !unique[uM[1]]) unique[uM[1]] = 1;
             });
             var epList = [];
             var epIdx = 1;
@@ -262,7 +245,6 @@ function detail(ids) {
             if (epList.length > 0) {
                 playFroms['默认'] = epList;
             } else {
-                // 最终兜底
                 playFroms['默认'] = ['第1集$' + rule.host + '/play/1/' + id];
             }
         }
@@ -280,34 +262,31 @@ function detail(ids) {
         };
         return JSON.stringify({ list: [vod] });
     } catch (e) {
-        return JSON.stringify({ list: [], error: String(e) });
+        return JSON.stringify({ list: [] });
     }
 }
 
-function search(key, quick, pg) {
-    if (!pg) pg = 1;
+// SPIDER.md: searchContent(key, quick, pg)
+function searchContent(key, quick, pg) {
+    if (!pg) pg = '1';
     try {
         var kw = encodeURIComponent(String(key || '').trim());
-        if (!kw) return JSON.stringify({ list: [], page: 1, pagecount: 1, total: 0 });
+        if (!kw) return JSON.stringify({ list: [], pagecount: 1 });
         var url = rule.host + '/search?q=' + kw;
-        if (pg > 1) url += '&page=' + pg;
+        if (parseInt(pg) > 1) url += '&page=' + pg;
         var resp = http(url, { headers: rule.headers, async: false });
         var list = [];
         if (resp && resp.code === 200) {
             list = parseList(resp.content);
         }
-        return JSON.stringify({
-            list: list,
-            page: parseInt(pg),
-            pagecount: 1,
-            total: list.length
-        });
+        return JSON.stringify({ list: list, pagecount: 1 });
     } catch (e) {
-        return JSON.stringify({ list: [], error: String(e), page: 1, pagecount: 1, total: 0 });
+        return JSON.stringify({ list: [], pagecount: 1 });
     }
 }
 
-function play(flag, id, flags) {
+// SPIDER.md: playerContent(flag, id, vipFlags)
+function playerContent(flag, id, vipFlags) {
     try {
         return JSON.stringify({ url: id, parse: 0 });
     } catch (e) {
@@ -316,23 +295,17 @@ function play(flag, id, flags) {
 }
 
 function proxy(params) { return []; }
-function sniffer() { return false; }
-function isVideo(url) {
-    return /m3u8|mp4|flv|avi|mkv|ts|webm/.test(url.toLowerCase());
-}
 
+// SPIDER.md 要求 export default
 var spiderObj = {
-    rule: rule,
     init: init,
-    home: home,
-    homeVod: homeVod,
-    category: category,
-    detail: detail,
-    search: search,
-    play: play,
-    proxy: proxy,
-    sniffer: sniffer,
-    isVideo: isVideo
+    homeContent: homeContent,
+    homeVideoContent: homeVideoContent,
+    categoryContent: categoryContent,
+    detailContent: detailContent,
+    searchContent: searchContent,
+    playerContent: playerContent,
+    proxy: proxy
 };
 
 export default spiderObj;
