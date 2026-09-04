@@ -1,5 +1,5 @@
-// drpy2 spider for juok3.top (剧OK) v8
-// 兼容markdown格式输出（drpy2 fetch可能返回markdown）
+// drpy2 spider for juok3.top (剧OK) v10
+// 使用配对方法解析markdown格式
 var rule = {
     title: '剧OK',
     host: 'https://juok3.top',
@@ -26,7 +26,7 @@ var rule = {
     play_parse: true,
     lazy: 'js:',
 
-    // 一级：使用搜索页
+    // 一级：配对detail和img URL
     一级: function(tid, pg, c, f) {
         var kwMap = {
             'movie': '电影',
@@ -40,78 +40,35 @@ var rule = {
         var html = fetch(url);
         var list = [];
 
-        // 匹配markdown格式: [![name](pic)](detail_url)
-        var mdRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/[^)]*\/)?\/detail\/(\d+)\/([A-Za-z0-9]+)\)/g;
+        // 提取detail URLs
+        var detailRe = /https:\/\/juok3\.top\/detail\/(\d+)\/([A-Za-z0-9]+)/g;
+        var detailMatches = html.match(detailRe) || [];
+
+        // 提取image URLs和alt text
+        var imgRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+        var imgMatches = [];
         var m;
-        while ((m = mdRe.exec(html)) !== null) {
-            var name = m[1].trim();
-            var pic = m[2];
-            var typeId = m[4];
-            var uid = m[5];
-            if (name && name.length > 1) {
-                list.push({
-                    vod_id: typeId + '/' + uid,
-                    vod_name: name,
-                    vod_pic: pic,
-                    type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
-                });
-            }
+        while ((m = imgRe.exec(html)) !== null) {
+            imgMatches.push({ name: m[1].trim(), pic: m[2] });
         }
 
-        // 匹配HTML格式: <a href="/detail/2/uid"><img src="pic" alt="name">
-        var htmlRe = /<a[^>]*href="\/detail\/(\d+)\/([A-Za-z0-9]+)"[^>]*>[\s\S]*?<img[^>]*src="(https?:\/\/[^"]+)"[^>]*alt="([^"]*)"[^>]*>/g;
-        while ((m = htmlRe.exec(html)) !== null) {
-            var typeId2 = m[1];
-            var uid2 = m[2];
-            var pic2 = m[3];
-            var name2 = m[4].trim();
-            if (!name2) {
-                var chunk = html.substring(m.index, m.index + 500);
-                var nameM = chunk.match(/<strong[^>]*>([^<]+)<\/strong>/);
-                name2 = nameM ? nameM[1].trim() : '';
-            }
-            if (name2 && name2.length > 1) {
-                list.push({
-                    vod_id: typeId2 + '/' + uid2,
-                    vod_name: name2,
-                    vod_pic: pic2,
-                    type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId2)-1] || '其他'
-                });
-            }
-        }
-
-        // 匹配外部链接 - markdown格式
-        var mdExtRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/[^)]*\/)?\/detail\/(external\/[^)]+\/\d+)\)/g;
-        while ((m = mdExtRe.exec(html)) !== null) {
-            var name3 = m[1].trim();
-            var pic3 = m[2];
-            var extPath = m[4];
-            if (name3 && name3.length > 1) {
-                list.push({
-                    vod_id: extPath,
-                    vod_name: name3,
-                    vod_pic: pic3,
-                    type_name: '其他'
-                });
-            }
-        }
-
-        // 匹配外部链接 - HTML格式
-        var htmlExtRe = /<a[^>]*href="\/detail\/(external\/[^"]+?\/\d+)"[^>]*>[\s\S]*?<img[^>]*src="(https?:\/\/[^"]+)"[^>]*>/g;
-        while ((m = htmlExtRe.exec(html)) !== null) {
-            var extPath2 = m[1];
-            var pic4 = m[2];
-            var chunk2 = html.substring(m.index, m.index + 500);
-            var name4 = chunk2.match(/alt="([^"]+)"/);
-            if (!name4) name4 = chunk2.match(/\*\*([^*]+)\*\*/);
-            var n = name4 ? name4[1].trim() : '';
-            if (n && n.length > 1) {
-                list.push({
-                    vod_id: extPath2,
-                    vod_name: n,
-                    vod_pic: pic4,
-                    type_name: '其他'
-                });
+        // 配对
+        var count = Math.min(detailMatches.length, imgMatches.length);
+        for (var i = 0; i < count; i++) {
+            var detailMatch = detailMatches[i].match(/\/detail\/(\d+)\/([A-Za-z0-9]+)/);
+            if (detailMatch) {
+                var typeId = detailMatch[1];
+                var uid = detailMatch[2];
+                var name = imgMatches[i].name;
+                var pic = imgMatches[i].pic;
+                if (name && name.length > 1) {
+                    list.push({
+                        vod_id: typeId + '/' + uid,
+                        vod_name: name,
+                        vod_pic: pic,
+                        type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
+                    });
+                }
             }
         }
 
@@ -147,32 +104,15 @@ var rule = {
             var h1M = html.match(/<h1[^>]*>([^<]+)/);
             vod.vod_name = h1M ? h1M[1].trim() : '';
         }
-        if (!vod.vod_name) {
-            var strongM = html.match(/<strong[^>]*>([^<]+)<\/strong>/);
-            vod.vod_name = strongM ? strongM[1].trim() : '';
-        }
-        if (!vod.vod_name) {
-            var mdTitleM = html.match(/\*\*([^\*]+)\*\*/);
-            vod.vod_name = mdTitleM ? mdTitleM[1].trim() : '';
-        }
 
         // 图片
         var picM = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/);
         if (!picM) picM = html.match(/<img[^>]*src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp))"/i);
-        if (!picM) picM = html.match(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/);
         vod.vod_pic = picM ? picM[1] : '';
 
         // 描述
         var descM = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
         vod.vod_content = descM ? descM[1] : '';
-        if (!vod.vod_content) {
-            var descM2 = html.match(/简介[\s\S]*?展开全部\s*([\s\S]*?)\s*手机/);
-            if (descM2) vod.vod_content = descM2[1].trim();
-        }
-        if (!vod.vod_content) {
-            var descM3 = html.match(/##\s*简介\s*\n([\s\S]*?)\n\n/);
-            if (descM3) vod.vod_content = descM3[1].trim();
-        }
 
         // 年份
         var yearM = html.match(/(\d{4})[年\-]/);
@@ -215,17 +155,6 @@ var rule = {
             playFroms[flag2].push({ num: epNum2, url: epUrl2, label: '第' + epNum2 + '集' });
         }
 
-        // external播放链接
-        var extPlayRe = /href="(\/play\/(external\/[^"]+))"/g;
-        while ((epM = extPlayRe.exec(html)) !== null) {
-            var epUrl3 = this.host + epM[1];
-            var epNum3 = 1;
-            var numMatch = epUrl3.match(/\/(\d+)(?:\?|$)/);
-            if (numMatch) epNum3 = parseInt(numMatch[1]);
-            if (!playFroms['external']) playFroms['external'] = [];
-            playFroms['external'].push({ num: epNum3, url: epUrl3, label: '第' + epNum3 + '集' });
-        }
-
         if (Object.keys(playFroms).length > 0) {
             var playFromArr = Object.keys(playFroms);
             var playUrlArr = playFromArr.map(function(f) {
@@ -249,77 +178,35 @@ var rule = {
         var html = fetch(url);
         var list = [];
 
-        // markdown格式
-        var mdRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/[^)]*\/)?\/detail\/(\d+)\/([A-Za-z0-9]+)\)/g;
+        // 提取detail URLs
+        var detailRe = /https:\/\/juok3\.top\/detail\/(\d+)\/([A-Za-z0-9]+)/g;
+        var detailMatches = html.match(detailRe) || [];
+
+        // 提取image URLs和alt text
+        var imgRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+        var imgMatches = [];
         var m;
-        while ((m = mdRe.exec(html)) !== null) {
-            var name = m[1].trim();
-            var pic = m[2];
-            var typeId = m[4];
-            var uid = m[5];
-            if (name && name.length > 1) {
-                list.push({
-                    vod_id: typeId + '/' + uid,
-                    vod_name: name,
-                    vod_pic: pic,
-                    type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
-                });
-            }
+        while ((m = imgRe.exec(html)) !== null) {
+            imgMatches.push({ name: m[1].trim(), pic: m[2] });
         }
 
-        // HTML格式
-        var htmlRe = /<a[^>]*href="\/detail\/(\d+)\/([A-Za-z0-9]+)"[^>]*>[\s\S]*?<img[^>]*src="(https?:\/\/[^"]+)"[^>]*alt="([^"]*)"[^>]*>/g;
-        while ((m = htmlRe.exec(html)) !== null) {
-            var typeId2 = m[1];
-            var uid2 = m[2];
-            var pic2 = m[3];
-            var name2 = m[4].trim();
-            if (!name2) {
-                var chunk = html.substring(m.index, m.index + 500);
-                var nameM = chunk.match(/<strong[^>]*>([^<]+)<\/strong>/);
-                name2 = nameM ? nameM[1].trim() : '';
-            }
-            if (name2 && name2.length > 1) {
-                list.push({
-                    vod_id: typeId2 + '/' + uid2,
-                    vod_name: name2,
-                    vod_pic: pic2,
-                    type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId2)-1] || '其他'
-                });
-            }
-        }
-
-        // 外部链接
-        var mdExtRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/[^)]*\/)?\/detail\/(external\/[^)]+\/\d+)\)/g;
-        while ((m = mdExtRe.exec(html)) !== null) {
-            var name3 = m[1].trim();
-            var pic3 = m[2];
-            var extPath = m[4];
-            if (name3 && name3.length > 1) {
-                list.push({
-                    vod_id: extPath,
-                    vod_name: name3,
-                    vod_pic: pic3,
-                    type_name: '其他'
-                });
-            }
-        }
-
-        var htmlExtRe = /<a[^>]*href="\/detail\/(external\/[^"]+?\/\d+)"[^>]*>[\s\S]*?<img[^>]*src="(https?:\/\/[^"]+)"[^>]*>/g;
-        while ((m = htmlExtRe.exec(html)) !== null) {
-            var extPath2 = m[1];
-            var pic4 = m[2];
-            var chunk2 = html.substring(m.index, m.index + 500);
-            var name4 = chunk2.match(/alt="([^"]+)"/);
-            if (!name4) name4 = chunk2.match(/\*\*([^*]+)\*\*/);
-            var n = name4 ? name4[1].trim() : '';
-            if (n && n.length > 1) {
-                list.push({
-                    vod_id: extPath2,
-                    vod_name: n,
-                    vod_pic: pic4,
-                    type_name: '其他'
-                });
+        // 配对
+        var count = Math.min(detailMatches.length, imgMatches.length);
+        for (var i = 0; i < count; i++) {
+            var detailMatch = detailMatches[i].match(/\/detail\/(\d+)\/([A-Za-z0-9]+)/);
+            if (detailMatch) {
+                var typeId = detailMatch[1];
+                var uid = detailMatch[2];
+                var name = imgMatches[i].name;
+                var pic = imgMatches[i].pic;
+                if (name && name.length > 1) {
+                    list.push({
+                        vod_id: typeId + '/' + uid,
+                        vod_name: name,
+                        vod_pic: pic,
+                        type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
+                    });
+                }
             }
         }
 
