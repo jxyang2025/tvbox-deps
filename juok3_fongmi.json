@@ -3,7 +3,7 @@
   "wallpaper": "https://bing.img.run/rand.php",
   "lives": [
     {
-      "name": "剧OK",
+      "name": "\u5267OK",
       "type": 0,
       "url": "https://juok3.top/"
     }
@@ -11,13 +11,13 @@
   "sites": [
     {
       "key": "juok3",
-      "name": "剧OK[js]",
+      "name": "\u5267OK[js]",
       "type": 3,
-      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
+      "api": "https://raw.githubusercontent.com/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
       "searchable": 1,
       "quickSearch": 1,
       "filterable": 1,
-      "ext": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js"
+      "ext": "https://raw.githubusercontent.com/jxyang2025/tvbox-deps/main/juok3_drpy2.js"
     }
   ]
 }
