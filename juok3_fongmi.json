@@ -1,14 +1,25 @@
 {
-    "key": "juok3",
-    "name": "剧OK",
-    "type": 3,
-    "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
-    "ext": "",
-    "searchable": 1,
-    "quickSearch": 1,
-    "filterable": 0,
-    "style": {
-        "type": "rect",
-        "ratio": 0.7
-    }
+    "spider": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/drpy2.min.js;md5;d41d8cd98f00b204e9800998ecf8427e",
+    "sites": [
+        {
+            "key": "juok3",
+            "name": "剧OK",
+            "type": 3,
+            "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
+            "searchable": 1,
+            "quickSearch": 1,
+            "filterable": 0,
+            "style": {
+                "type": "rect",
+                "ratio": 0.7
+            }
+        }
+    ],
+    "parses": [
+        {
+            "name": "默认",
+            "url": "https://jx.jsonplayer.com/player/?url=",
+            "type": 0
+        }
+    ]
 }
