@@ -1,5 +1,5 @@
-// drpy2 spider for juok3.top (剧OK) v10
-// 使用配对方法解析markdown格式
+// drpy2 spider for juok3.top (剧OK) v11
+// 修复lazy函数，使用正确的parse格式
 var rule = {
     title: '剧OK',
     host: 'https://juok3.top',
@@ -24,7 +24,9 @@ var rule = {
     double: false,
     timeout: 15000,
     play_parse: true,
-    lazy: 'js:',
+    lazy: function(url) {
+        return JSON.stringify({ parse: 1, url: url, js: '' });
+    },
 
     // 一级：配对detail和img URL
     一级: function(tid, pg, c, f) {
@@ -221,9 +223,5 @@ var rule = {
         }
 
         return JSON.stringify({ list: uniqueList, page: parseInt(pg) || 1, pagecount: 1, limit: uniqueList.length });
-    },
-
-    lazy: function(url) {
-        return 'parslet://' + url;
     }
 };
