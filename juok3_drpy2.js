@@ -1,311 +1,301 @@
-// 剧OK (juok3.top) — FongMi/TV 原生 spider v14
-// 严格遵循 FongMi SPIDER.md 函数命名规范
-// QuickJS export default spiderObj
-// AppleCMS v10 短剧站
-// 2026-09-04
-
+// 剧OK (juok3.top) - drpy2 规则
+// AppleCMS v10 - HTML 解析（API 已 404）
 var rule = {
     title: '剧OK',
     host: 'https://juok3.top',
-    homeUrl: '/category/movie',
-    class_name: '电影&电视剧&综艺&动漫',
-    class_url: 'movie&tv&variety&anime',
-    searchable: 1,
+    homeUrl: '/',
+    url: '/vod/type/fyclass-fypage.html',
+    searchUrl: '/vod/search/**-fypage.html',
+    searchable: 2,
     quickSearch: 1,
     filterable: 0,
+    class_name: '电影&电视剧&动漫&综艺&短剧',
+    class_url: '1&2&3&4&5',
     headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
     },
-    play_parse: 0,
-    lazy: ''
-};
-
-// 从HTML或markdown中解析列表
-// FongMi http() 返回原始HTML；web_extract缓存为markdown
-function parseList(body) {
-    var list = [];
-    var seen = {};
-    if (!body) return list;
-
-    // 格式1: AppleCMS v10 标准HTML
-    var htmlRe = /<a[^>]*href=["']\/detail\/(\d+)\/([A-Za-z0-9]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-    var m;
-    while ((m = htmlRe.exec(body)) !== null) {
-        var typeId = m[1];
-        var uid = m[2];
-        var inner = m[3];
-        var picM = inner.match(/src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp))["']/i);
-        var pic = picM ? picM[1] : '';
-        var nameM = inner.match(/alt=["']([^"']+)["']/i) || inner.match(/title=["']([^"']+)["']/i) || inner.match(/<span[^>]*>([^<]+)<\/span>/i);
-        var name = nameM ? nameM[1].trim() : '';
-        if (!name || name.length < 2) continue;
-        var key = uid;
-        if (!seen[key]) {
-            seen[key] = 1;
-            list.push({ vod_id: key, vod_name: name, vod_pic: pic, vod_remarks: '' });
-        }
-        if (list.length >= 30) break;
-    }
-
-    // 格式2: markdown格式 (drpy2/fetch返回)
-    if (list.length === 0) {
-        var mdRe = /\[!\[([^\]]*)\]\((https?:\/\/[^)]+)\)[\s\S]*?\]\((https?:\/\/[^)]+)\)/gi;
-        while ((m = mdRe.exec(body)) !== null) {
-            var name2 = m[1].trim();
-            var pic2 = m[2];
-            var url2 = m[3];
-            var uidM = url2.match(/\/detail\/(\d+)\/([A-Za-z0-9]+)$/);
-            if (!uidM) continue;
-            var uid2 = uidM[2];
-            if (!name2 || name2.length < 2) continue;
-            if (!seen[uid2]) {
-                seen[uid2] = 1;
-                list.push({ vod_id: uid2, vod_name: name2, vod_pic: pic2, vod_remarks: '' });
-            }
-            if (list.length >= 30) break;
-        }
-    }
-
-    // 格式3: 宽松配对
-    if (list.length === 0) {
-        var imgs = body.match(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g) || [];
-        var details = body.match(/\[([^\]]+)\]\((https?:\/\/[^)]+\/detail\/\d+\/[A-Za-z0-9]+)\)/g) || [];
-        var cnt = Math.min(imgs.length, details.length, 30);
-        for (var i = 0; i < cnt; i++) {
-            var imgM = imgs[i].match(/!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/);
-            var detM = details[i].match(/\[([^\]]+)\]\((https?:\/\/[^)]+\/detail\/(\d+)\/([A-Za-z0-9]+))\)/);
-            if (imgM && detM) {
-                var name3 = imgM[1].trim() || detM[1].trim();
-                var pic3 = imgM[2];
-                var uid3 = detM[3];
-                if (name3.length > 1 && !seen[uid3]) {
-                    seen[uid3] = 1;
-                    list.push({ vod_id: uid3, vod_name: name3, vod_pic: pic3, vod_remarks: '' });
-                }
-            }
-        }
-    }
-
-    return list;
-}
-
-function init(ext) {
-    return '';
-}
-
-// SPIDER.md: homeContent(filter)
-function homeContent(filter) {
-    try {
-        var resp = http(rule.host, { headers: rule.headers, async: false });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
-        var list = parseList(resp.content);
-        var cls = rule.class_name.split('&').map(function(name, i) {
-            return { type_id: rule.class_url.split('&')[i], type_name: name };
-        });
-        return JSON.stringify({ class: cls, list: list });
-    } catch (e) {
-        return JSON.stringify({ class: [], list: [] });
-    }
-}
-
-// SPIDER.md: homeVideoContent()
-function homeVideoContent() {
-    try {
-        var resp = http(rule.host, { headers: rule.headers, async: false });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
-        var list = parseList(resp.content).slice(0, 10);
-        return JSON.stringify({ list: list });
-    } catch (e) {
-        return JSON.stringify({ list: [] });
-    }
-}
-
-// SPIDER.md: categoryContent(tid, pg, filter, extend)
-function categoryContent(tid, pg, filter, extend) {
-    if (!pg || parseInt(pg) <= 0) pg = '1';
-    try {
-        var clsMap = { 'movie': '电影', 'tv': '电视剧', 'variety': '综艺', 'anime': '动漫' };
-        var clsName = clsMap[tid] || tid;
-        var urlPath = '/category/' + tid;
-        if (parseInt(pg) > 1) urlPath += '/page/' + pg + '.html';
-
-        var resp = http(rule.host + urlPath, { headers: rule.headers, async: false });
-        var list = [];
-        if (resp && resp.code === 200 && resp.content) {
-            list = parseList(resp.content);
-        }
-
-        // 备选：搜索页
-        if (list.length === 0) {
-            var searchUrl = rule.host + '/search?q=' + encodeURIComponent(clsName);
-            if (parseInt(pg) > 1) searchUrl += '&page=' + pg;
-            var resp2 = http(searchUrl, { headers: rule.headers, async: false });
-            if (resp2 && resp2.code === 200) {
-                list = parseList(resp2.content);
-            }
-        }
-
-        return JSON.stringify({
-            list: list,
-            page: parseInt(pg),
-            pagecount: 999,
-            total: list.length
-        });
-    } catch (e) {
-        return JSON.stringify({ list: [], page: 1, pagecount: 1, total: 0 });
-    }
-}
-
-// SPIDER.md: detailContent(ids)
-function detailContent(ids) {
-    try {
-        var id = ids || '';
-        if (!id) return JSON.stringify({ list: [] });
-        // ids 可能是数组
-        if (Array.isArray(id)) id = id[0];
-
-        var types = ['1', '2', '3', '4'];
-        var body = null;
-        for (var ti = 0; ti < types.length; ti++) {
-            var url = rule.host + '/detail/' + types[ti] + '/' + id;
-            var resp = http(url, { headers: rule.headers, async: false });
-            if (resp && resp.code === 200 && resp.content) {
-                if (/play|episodes|集|vod_play/.test(resp.content)) {
-                    body = resp.content;
-                    break;
-                }
-            }
-        }
-        if (!body) throw 'detail not found for ' + id;
-
-        var nm = body.match(/<title>([^<]+)<\/title>/);
-        var name = nm ? nm[1].trim().split('-')[0].split('|')[0].trim() : '';
-        if (!name) {
-            var h1M = body.match(/<h1[^>]*>([^<]+)<\/h1>/);
-            name = h1M ? h1M[1].trim() : ('影片' + id);
-        }
-        var year = '';
-        var ym = name.match(/(\d{4})/);
-        if (ym) year = ym[1];
-
-        var pm = body.match(/<img[^>]*src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp))"/i);
-        var pic = pm ? pm[1] : '';
-        if (!pic) {
-            pm = body.match(/<meta[^>]*property="og:image"[^>]*content="(.*?)"/i);
-            pic = pm ? pm[1] : '';
-        }
-
-        var content = '';
-        var descM = body.match(/<meta[^>]*name="description"[^>]*content="(.*?)"/i);
-        if (descM) content = descM[1].replace(/<[^>]+>/g, '');
-        if (!content) {
-            var introM = body.match(/<span[^>]*class=["']intro["'][^>]*>([\s\S]*?)<\/span>/i);
-            if (introM) content = introM[1].replace(/<[^>]+>/g, '');
-        }
-
-        var actorM = body.match(/主演[：:]\s*([^<\n]+)/);
-        var actor = actorM ? actorM[1].replace(/<[^>]+>/g, '').trim() : '';
-        var dirM = body.match(/导演[：:]\s*([^<\n]+)/);
-        var director = dirM ? dirM[1].replace(/<[^>]+>/g, '').trim() : '';
-
-        // 播放列表
-        var playFroms = {};
-        var playRe = /<a[^>]*href="(\/play\/\d+\/[^"]+\/\d+(?:\.html)?)"[^>]*>([^<]+)<\/a>/gi;
-        var pm2;
-        while ((pm2 = playRe.exec(body)) !== null) {
-            var label = pm2[2].trim() || ('第' + playRe.lastIndex + '集');
-            var playUrl = rule.host + pm2[1];
-            if (!playFroms['默认']) playFroms['默认'] = [];
-            playFroms['默认'].push(label + '$' + playUrl);
-        }
-
-        if (!playFroms['默认'] || playFroms['默认'].length === 0) {
-            var playRe2 = /<a[^>]*href="(\/detail\/\d+\/[^"]+\/\d+\.html)"[^>]*>([^<]+)<\/a>/gi;
-            while ((pm2 = playRe2.exec(body)) !== null) {
-                var label2 = pm2[2].trim();
-                var url2 = rule.host + pm2[1];
-                if (!playFroms['默认']) playFroms['默认'] = [];
-                playFroms['默认'].push(label2 + '$' + url2);
-            }
-        }
-
-        if (!playFroms['默认'] || playFroms['默认'].length === 0) {
-            var sources = body.match(/href="(\/play\/\d+\/[^"]+\.html)"/g) || [];
-            var unique = {};
-            sources.forEach(function(s) {
-                var uM = s.match(/href="(\/play\/\d+\/[^"]+\.html)"/);
-                if (uM && !unique[uM[1]]) unique[uM[1]] = 1;
+    timeout: 10000,
+    limit: 20,
+    play_parse: true,
+    lazy: $js.toString(() => {
+        // 本地播放直接返回
+        input = input || VOD.vod_play_url;
+        if (input && /^https?:\/\//.test(input)) {
+            return JSON.stringify({
+                parse: 0,
+                url: input,
+                header: rule.headers
             });
-            var epList = [];
-            var epIdx = 1;
-            for (var key in unique) {
-                epList.push('第' + epIdx + '集$' + rule.host + key);
-                epIdx++;
+        }
+        return JSON.stringify({ parse: 0, url: input || '' });
+    }),
+    // 列表页解析
+    一级: $js.toString(() => {
+        // 尝试请求页面
+        let html = request(input, { headers: rule.headers });
+        if (!html || html.length < 100) {
+            // 试试备选URL模式
+            let altUrl = input.replace('/vod/type/', '/vodtype/');
+            html = request(altUrl, { headers: rule.headers });
+        }
+        if (!html || html.length < 100) {
+            console.log('[juok3] 请求失败: ' + input);
+            VODS = [{
+                vod_name: '❌ juok3.top 请求失败 - 域名可能已过期或网站维护',
+                vod_id: 'error',
+                vod_pic: '',
+                vod_remarks: '请检查 https://juok3.top 是否可访问'
+            }];
+            return;
+        }
+
+        let items = [];
+        // 尝试多种选择器匹配AppleCMS HTML列表
+        let patterns = [
+            /<a[^>]*href="\/voddetail\/(\d+)\.html"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*">([^<]*)<\/span>[\s\S]*?<em[^>]*>([^<]*)<\/em>/gi,
+            /<a[^>]+href="([^"]+)"[^>]*>[\s\S]{0,500}?<img[^>]+src="([^"]+)"[^>]+alt="([^"]*)"[\s\S]{0,500}?<\/a>/gi,
+            /<a[^>]*href="\/detail\/(\d+)\/(\d+)\.html"[^>]*>[\s\S]*?<img[^>]*src="([^"]*)"[\s\S]*?alt="([^"]*)"[\s\S]*?<\/a>/gi,
+            /<a[^>]*href="\/[^"]*detail[^"]*"[\s\S]{0,200}?<img[^>]+src="([^"]*)"[^>]*>[\s\S]{0,200}?<([a-z]+)[^>]*>([^<]*)<\/([a-z]+)>/gi
+        ];
+
+        for (let pi = 0; pi < patterns.length; pi++) {
+            let match;
+            while ((match = patterns[pi].exec(html)) !== null) {
+                let vodId, name, pic, remarks;
+                if (pi === 0) {
+                    vodId = match[1];
+                    pic = match[2] || '';
+                    name = match[3] || '';
+                    remarks = match[4] || '';
+                } else if (pi === 1) {
+                    let href = match[1];
+                    let idMatch = href.match(/(\d+)/);
+                    vodId = idMatch ? idMatch[1] : href;
+                    pic = match[2];
+                    name = match[3];
+                    remarks = '';
+                } else if (pi === 2) {
+                    vodId = match[1];
+                    pic = match[3] || '';
+                    name = match[4] || '';
+                    remarks = '';
+                } else {
+                    vodId = 'unknown';
+                    pic = match[1] || '';
+                    name = match[3] || match[2] || '';
+                    remarks = '';
+                }
+                if (name && name.trim().length > 0) {
+                    items.push({
+                        vod_id: vodId + '',
+                        vod_name: name.trim(),
+                        vod_pic: pic || '',
+                        vod_remarks: (remarks || '').trim()
+                    });
+                }
+                if (items.length >= rule.limit) break;
             }
-            if (epList.length > 0) {
-                playFroms['默认'] = epList;
-            } else {
-                playFroms['默认'] = ['第1集$' + rule.host + '/play/1/' + id];
+            if (items.length > 0) break;
+        }
+
+        if (items.length === 0) {
+            // 尝试JSON API
+            let apiUrl = 'https://juok3.top/api.php/provide/vod/?ac=list&t=' + (VOD ? VOD.type_id || '1' : '1');
+            try {
+                let apiHtml = request(apiUrl, { headers: rule.headers });
+                if (apiHtml) {
+                    // Try to parse JSON
+                    let json = JSON.parse(apiHtml);
+                    if (json && json.list && json.list.length > 0) {
+                        json.list.forEach(function(v) {
+                            if (v.vod_id) {
+                                items.push({
+                                    vod_id: v.vod_id + '',
+                                    vod_name: v.vod_name || '未知',
+                                    vod_pic: v.vod_pic || '',
+                                    vod_remarks: v.vod_remarks || '',
+                                    vod_content: v.vod_content || ''
+                                });
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.log('[juok3] API fallback failed: ' + e.message);
             }
         }
 
-        var vod = {
-            vod_id: id,
-            vod_name: name,
-            vod_pic: pic,
-            vod_year: year,
-            vod_content: content,
-            vod_actor: actor,
-            vod_director: director,
-            vod_play_from: '默认',
-            vod_play_url: playFroms['默认'].join('#')
-        };
-        return JSON.stringify({ list: [vod] });
-    } catch (e) {
-        return JSON.stringify({ list: [] });
-    }
-}
-
-// SPIDER.md: searchContent(key, quick, pg)
-function searchContent(key, quick, pg) {
-    if (!pg) pg = '1';
-    try {
-        var kw = encodeURIComponent(String(key || '').trim());
-        if (!kw) return JSON.stringify({ list: [], pagecount: 1 });
-        var url = rule.host + '/search?q=' + kw;
-        if (parseInt(pg) > 1) url += '&page=' + pg;
-        var resp = http(url, { headers: rule.headers, async: false });
-        var list = [];
-        if (resp && resp.code === 200) {
-            list = parseList(resp.content);
+        if (items.length === 0) {
+            VODS = [{
+                vod_name: '❌ juok3.top 解析失败，无可用数据',
+                vod_id: 'error',
+                vod_pic: '',
+                vod_remarks: '可能被Cloudflare拦截或域名已失效'
+            }];
+        } else {
+            VODS = items;
         }
-        return JSON.stringify({ list: list, pagecount: 1 });
-    } catch (e) {
-        return JSON.stringify({ list: [], pagecount: 1 });
-    }
-}
+    }),
+    // 详情页解析
+    二级: $js.toString(() => {
+        let id = VOD.vod_id + '';
+        // 尝试多种URL模式获取详情
+        let urls = [
+            rule.host + '/voddetail/' + id + '.html',
+            rule.host + '/detail/' + id + '.html',
+            rule.host + '/vod/' + id + '.html',
+            rule.host + '/play/' + id + '.html'
+        ];
 
-// SPIDER.md: playerContent(flag, id, vipFlags)
-function playerContent(flag, id, vipFlags) {
-    try {
-        return JSON.stringify({ url: id, parse: 0 });
-    } catch (e) {
-        return JSON.stringify({ url: '', parse: 0 });
-    }
-}
+        let html = '';
+        for (let ui = 0; ui < urls.length; ui++) {
+            html = request(urls[ui], { headers: rule.headers });
+            if (html && html.length > 200) break;
+        }
 
-function proxy(params) { return []; }
+        if (!html || html.length < 100) {
+            console.log('[juok3] 详情请求失败: id=' + id);
+            VOD.vod_play_from = '❌ 详情加载失败';
+            VOD.vod_play_url = '请检查juok3.top是否可访问$';
+            return;
+        }
 
-// SPIDER.md 要求 export default
-var spiderObj = {
-    init: init,
-    homeContent: homeContent,
-    homeVideoContent: homeVideoContent,
-    categoryContent: categoryContent,
-    detailContent: detailContent,
-    searchContent: searchContent,
-    playerContent: playerContent,
-    proxy: proxy
+        // 提取播放线路和集数
+        // AppleCMS v10 常见的播放列表格式
+        let allPlayUrls = [];
+
+        // 匹配播放列表，常见格式：<ul class="stui-content__playlist clearfix">
+        let playlistBlocks = html.match(/<ul[^>]*class=["'][^"']*playlist[^"']*["'][^>]*>[\s\S]*?<\/ul>/gi)
+            || html.match(/<div[^>]*class=["'][^"']*playlist[^"']*["'][^>]*>[\s\S]*?<\/div>/gi)
+            || html.match(/<ul[^>]*class=["'][^"']*content__playlist[^"']*["'][^>]*>[\s\S]*?<\/ul>/gi)
+            || [];
+
+        let playGroups = [];
+
+        // 查找线路名称
+        let lineNames = html.match(/<h3[^>]*>([^<]+)<\/h3>/gi) || [];
+
+        if (playlistBlocks.length === 0) {
+            // 直接找所有播放链接
+            let allLinks = html.match(/<a[^>]+href=["']([^"']+\d+[^"']*)["'][^>]*>([^<]{1,30})<\/a>/gi) || [];
+            let eps = [];
+            for (let li = 0; li < allLinks.length; li++) {
+                let hrefMatch = allLinks[li].match(/href=["']([^"']+)["']/i);
+                let nameMatch = allLinks[li].match(/>([^<]+)</i);
+                let href = hrefMatch ? hrefMatch[1].trim() : '';
+                let name = nameMatch ? nameMatch[1].trim() : '';
+                // 只保留含"集"、"第"、"集数"字样的链接
+                if (/[集第\d]/.test(name) || /\d/.test(name)) {
+                    eps.push(name + '$' + href);
+                }
+            }
+            if (eps.length > 0) {
+                playGroups.push({
+                    from: '线路1',
+                    urls: eps.join('#')
+                });
+            }
+        } else {
+            for (let bi = 0; bi < playlistBlocks.length; bi++) {
+                let block = playlistBlocks[bi];
+                let fromName = '线路' + (bi + 1);
+                if (bi < lineNames.length && lineNames[bi]) {
+                    let nMatch = lineNames[bi].match(/>([^<]+)</);
+                    if (nMatch) fromName = nMatch[1].trim();
+                }
+                let links = block.match(/<a[^>]+href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi) || [];
+                let eps = [];
+                for (let li = 0; li < links.length; li++) {
+                    let hrefMatch = links[li].match(/href=["']([^"']+)["']/i);
+                    let nameMatch = links[li].match(/>([^<]+)</i);
+                    let href = hrefMatch ? hrefMatch[1].trim() : '';
+                    let name = nameMatch ? nameMatch[1].trim() : '';
+                    if (href && name) {
+                        eps.push(name + '$' + href);
+                    }
+                }
+                if (eps.length > 0) {
+                    playGroups.push({
+                        from: fromName,
+                        urls: eps.join('#')
+                    });
+                }
+            }
+        }
+
+        if (playGroups.length === 0) {
+            // 尝试匹配任何带数字的链接
+            VOD.vod_play_from = '❌ 未找到播放源';
+            VOD.vod_play_url = '该视频可能已下架或域名失效$';
+            return;
+        }
+
+        VOD.vod_play_from = playGroups.map(function(g) { return g.from; }).join('$$$');
+        VOD.vod_play_url = playGroups.map(function(g) { return g.urls; }).join('$$$');
+    }),
+    // 搜索
+    搜索: $js.toString(() => {
+        let kw = input;
+        if (!kw || kw === '**') {
+            VODS = [];
+            return;
+        }
+        let searchUrl = rule.host + '/vod/search/' + encodeURIComponent(kw) + '-1.html';
+        let html = request(searchUrl, { headers: rule.headers });
+        if (!html || html.length < 50) {
+            // 尝试备选搜索URL
+            let altUrl = rule.host + '/index.php/vod/search/wd/' + encodeURIComponent(kw) + '.html';
+            html = request(altUrl, { headers: rule.headers });
+        }
+        if (!html || html.length < 50) {
+            VODS = [{
+                vod_name: '❌ 搜索请求失败',
+                vod_id: 'error',
+                vod_pic: '',
+                vod_remarks: 'juok3.top 可能不可用'
+            }];
+            return;
+        }
+
+        // 复用列表页的解析逻辑
+        let patterns = [
+            /<a[^>]*href="\/voddetail\/(\d+)\.html"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*">([^<]*)<\/span>[\s\S]*?<em[^>]*>([^<]*)<\/em>/gi,
+            /<a[^>]+href="(\/detail\/(\d+)\/(\d+)\.html)"[^>]*>[\s\S]*?<img[^>]+src="([^"]*)"[\s\S]*?alt="([^"]*)"[\s\S]*?<\/a>/gi,
+            /<a[^>]+href="([^"]+)"[^>]*>[\s\S]{0,200}?<img[^>]+src="([^"]+)"[^>]+alt="([^"]*)"[\s\S]{0,200}?<\/a>/gi
+        ];
+
+        let items = [];
+        for (let pi = 0; pi < patterns.length; pi++) {
+            let match;
+            while ((match = patterns[pi].exec(html)) !== null) {
+                let vodId = match[1] || 'unknown';
+                let name = match[match.length - 2] || match[match.length - 1] || '';
+                let pic = match[match.length - 3] || match[match.length - 2] || '';
+                let remarks = match[match.length - 1] || '';
+                if (name && name.trim().length > 1) {
+                    items.push({
+                        vod_id: vodId + '',
+                        vod_name: name.trim(),
+                        vod_pic: pic || '',
+                        vod_remarks: (remarks || '').trim()
+                    });
+                }
+                if (items.length >= rule.limit) break;
+            }
+            if (items.length > 0) break;
+        }
+
+        if (items.length === 0) {
+            VODS = [{
+                vod_name: '❌ 搜索"' + kw + '"无结果',
+                vod_id: 'error',
+                vod_pic: '',
+                vod_remarks: 'juok3.top 可能不可用或无此资源'
+            }];
+        } else {
+            VODS = items;
+        }
+    })
 };
-
-export default spiderObj;
