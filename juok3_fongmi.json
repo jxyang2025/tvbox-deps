@@ -13,8 +13,7 @@
       "key": "juok3",
       "name": "剧OK[js]",
       "type": 3,
-      "api": "https://gh.927223.xyz/https://raw.githubusercontent.com/qist/tvbox/master/FTY/drpy2.min.js",
-      "ext": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
+      "api": "https://cdn.521986.xyz/gh/jxyang2025/tvbox-deps/main/juok3_drpy2.js",
       "searchable": 1,
       "quickSearch": 1,
       "filterable": 0
