@@ -1,6 +1,6 @@
-// juok3 (剧OK) — FongMi 原生 Spider v6
-// v5 修复：pairItems 空结果时不返回错误；emoji 导致显示异常
-// v6：pairItems 空结果时返回错误条目；去除 emoji
+// juok3 (剧OK) — FongMi 原生 Spider v7
+// v6 修复：错误条目 vod_pic 为空被 FongMi 推荐列表过滤
+// v7：使用真实封面图作为错误条目占位图
 
 var rule = {
     title: '剧OK',
@@ -24,6 +24,9 @@ var rule = {
     play_parse: 0,
     lazy: ''
 };
+
+// 真实封面图（来自 juok3.top 首页缓存）
+var FALLBACK_PIC = 'https://p3.qhimg.com/d/dy_18a20e3e7b26aa7fdee7dce66d6f47ea.jpg';
 
 function httpGet(url, isDetail) {
     var h = {};
@@ -69,7 +72,7 @@ function pairItems(body) {
         items.push({
             vod_id: urls[i].cid + '_' + urls[i].sid,
             vod_name: name,
-            vod_pic: imgs[i] ? imgs[i].src : '',
+            vod_pic: imgs[i] ? imgs[i].src : FALLBACK_PIC,
             vod_remarks: remarks[i] || ''
         });
         if (items.length >= 40) break;
@@ -84,6 +87,10 @@ function filterByCid(items, cid) {
         if (parts[0] === cid) filtered.push(items[i]);
     }
     return filtered;
+}
+
+function errItem(msg) {
+    return { vod_id: 'err', vod_name: '[剧OK] ' + msg, vod_pic: FALLBACK_PIC, vod_remarks: '检查网络或域名' };
 }
 
 function init(ext) { return ''; }
@@ -102,7 +109,7 @@ function home(filter) {
         ];
         return JSON.stringify({ class: cls, list: items });
     } catch (e) {
-        return JSON.stringify({ class: [], list: [{ vod_id: 'err_home', vod_name: '[剧OK] 首页失败: ' + e, vod_pic: '', vod_remarks: '请检查网络' }] });
+        return JSON.stringify({ class: [], list: [errItem('首页失败: ' + e)] });
     }
 }
 
@@ -114,7 +121,7 @@ function homeVod() {
         if (items.length === 0) throw '首页解析无数据';
         return JSON.stringify({ list: items });
     } catch (e) {
-        return JSON.stringify({ list: [{ vod_id: 'err_vod', vod_name: '[剧OK] 推荐失败: ' + e, vod_pic: '', vod_remarks: '请检查网络' }] });
+        return JSON.stringify({ list: [errItem('推荐失败: ' + e)] });
     }
 }
 
@@ -128,7 +135,7 @@ function category(tid, pg, filter, ext) {
         var filtered = filterByCid(allItems, tid);
         return JSON.stringify({ list: filtered, page: 1, pagecount: 1, total: filtered.length });
     } catch (e) {
-        return JSON.stringify({ list: [{ vod_id: 'err_cat', vod_name: '[剧OK] 分类' + tid + '失败: ' + e, vod_pic: '', vod_remarks: '请检查网络' }] });
+        return JSON.stringify({ list: [errItem('分类' + tid + '失败: ' + e)] });
     }
 }
 
@@ -172,13 +179,13 @@ function detail(ids) {
                 eps.push('第' + em[3] + '集$' + rule.host + '/play/' + em[1] + '/' + em[2] + '/' + em[3] + '?s=qiyi');
             }
         }
-        if (eps.length === 0) return JSON.stringify({ list: [{ vod_id: id, vod_name: '[剧OK] 未找到播放源', vod_pic: '', vod_content: name }] });
+        if (eps.length === 0) return JSON.stringify({ list: [{ vod_id: id, vod_name: '[剧OK] 未找到播放源', vod_pic: FALLBACK_PIC, vod_content: name }] });
         return JSON.stringify({ list: [{
             vod_id: id, vod_name: name, vod_pic: pic, vod_content: content,
             vod_play_from: '剧OK', vod_play_url: eps.join('#')
         }] });
     } catch (e) {
-        return JSON.stringify({ list: [{ vod_id: 'err_det', vod_name: '[剧OK] 详情失败: ' + e, vod_pic: '', vod_remarks: id }] });
+        return JSON.stringify({ list: [errItem('详情失败: ' + e)] });
     }
 }
 
@@ -191,7 +198,7 @@ function search(key, quick, pg) {
         var items = pairItems(resp.content);
         return JSON.stringify({ list: items, page: parseInt(pg), pagecount: 999, total: items.length });
     } catch (e) {
-        return JSON.stringify({ list: [{ vod_id: 'err_search', vod_name: '[剧OK] 搜索失败: ' + e, vod_pic: '', vod_remarks: key }] });
+        return JSON.stringify({ list: [errItem('搜索失败: ' + e)] });
     }
 }
 
