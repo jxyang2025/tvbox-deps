@@ -1,5 +1,5 @@
-// drpy2 spider for juok3.top (剧OK) v11
-// 修复lazy函数，使用正确的parse格式
+// drpy2 spider for juok3.top (剧OK) v12
+// 根据drpy2接口文档重新设计
 var rule = {
     title: '剧OK',
     host: 'https://juok3.top',
@@ -9,40 +9,34 @@ var rule = {
     quickSearch: 1,
     filterable: 0,
     headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     },
     class_parse: function() {
         return [
-            { type_id: 'movie', type_name: '电影' },
-            { type_id: 'tv', type_name: '电视剧' },
-            { type_id: 'variety', type_name: '综艺' },
-            { type_id: 'anime', type_name: '动漫' }
+            { type_id: '1', type_name: '电影' },
+            { type_id: '2', type_name: '电视剧' },
+            { type_id: '3', type_name: '综艺' },
+            { type_id: '4', type_name: '动漫' }
         ];
     },
     double: false,
     timeout: 15000,
     play_parse: true,
     lazy: function(url) {
-        return JSON.stringify({ parse: 1, url: url, js: '' });
+        return { parse: 1, url: url, js: '' };
     },
 
-    // 一级：配对detail和img URL
+    // 一级：返回drpy2标准格式
     一级: function(tid, pg, c, f) {
-        var kwMap = {
-            'movie': '电影',
-            'tv': '电视剧',
-            'variety': '综艺',
-            'anime': '动漫'
-        };
+        var kwMap = { '1': '电影', '2': '电视剧', '3': '综艺', '4': '动漫' };
         var kw = kwMap[tid] || '电影';
         var url = this.host + '/search?q=' + encodeURIComponent(kw);
         if (pg > 1) url += '&page=' + pg;
+        
         var html = fetch(url);
         var list = [];
 
-        // 提取detail URLs
+        // 提取detail URLs: https://juok3.top/detail/{typeId}/{uid}
         var detailRe = /https:\/\/juok3\.top\/detail\/(\d+)\/([A-Za-z0-9]+)/g;
         var detailMatches = html.match(detailRe) || [];
 
@@ -64,11 +58,12 @@ var rule = {
                 var name = imgMatches[i].name;
                 var pic = imgMatches[i].pic;
                 if (name && name.length > 1) {
+                    // vod_id格式: type_id$/detail/{typeId}/{uid}
                     list.push({
-                        vod_id: typeId + '/' + uid,
+                        vod_id: tid + '$/detail/' + typeId + '/' + uid,
                         vod_name: name,
                         vod_pic: pic,
-                        type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
+                        vod_remarks: ''
                     });
                 }
             }
@@ -89,13 +84,19 @@ var rule = {
             list: uniqueList,
             page: parseInt(pg) || 1,
             pagecount: 1,
-            limit: uniqueList.length
+            limit: uniqueList.length,
+            total: uniqueList.length
         });
     },
 
     // 二级详情
     二级: function(id) {
-        var url = this.host + '/detail/' + id;
+        // id格式: tid$/detail/{typeId}/{uid}
+        var parts = id.split('$/detail/');
+        var typeId = parts[1] ? parts[1].split('/')[0] : '1';
+        var uid = parts[1] ? parts[1].split('/')[1] : '';
+        
+        var url = this.host + '/detail/' + typeId + '/' + uid;
         var html = fetch(url);
         var vod = {};
 
@@ -128,10 +129,14 @@ var rule = {
         var dirM = html.match(/导演[：:]\s*([^<\n]+)/);
         vod.vod_director = dirM ? dirM[1].replace(/\[([^\]]+)\]/g, '$1').trim() : '';
 
+        // 类型
+        var typeM = html.match(/类型[：:]\s*([^<\n]+)/);
+        vod.type_name = typeM ? typeM[1].trim() : '';
+
         // 播放链接
         var playFroms = {};
 
-        // markdown格式: [第N集](url)
+        // markdown格式: [第N集](url) 或 [播放中第N集](url)
         var mdEpRe = /\[(?:播放中)?第(\d+)集?\]\((https?:\/\/[^)]+)\)/g;
         var epM;
         while ((epM = mdEpRe.exec(html)) !== null) {
@@ -167,7 +172,7 @@ var rule = {
             vod.vod_play_url = playUrlArr.join('$$$');
         } else {
             vod.vod_play_from = '默认';
-            vod.vod_play_url = '第1集$' + this.host + '/play/' + id + '/1?s=qiyi';
+            vod.vod_play_url = '第1集$' + this.host + '/play/' + typeId + '/' + uid + '/1?s=qiyi';
         }
 
         return JSON.stringify({ list: [vod], page: 1, pagecount: 1, limit: 60 });
@@ -203,10 +208,10 @@ var rule = {
                 var pic = imgMatches[i].pic;
                 if (name && name.length > 1) {
                     list.push({
-                        vod_id: typeId + '/' + uid,
+                        vod_id: '1$/detail/' + typeId + '/' + uid,
                         vod_name: name,
                         vod_pic: pic,
-                        type_name: ['电影','电视剧','综艺','动漫'][parseInt(typeId)-1] || '其他'
+                        vod_remarks: ''
                     });
                 }
             }
@@ -222,6 +227,6 @@ var rule = {
             }
         }
 
-        return JSON.stringify({ list: uniqueList, page: parseInt(pg) || 1, pagecount: 1, limit: uniqueList.length });
+        return JSON.stringify({ list: uniqueList, page: parseInt(pg) || 1, pagecount: 1, limit: uniqueList.length, total: uniqueList.length });
     }
 };
