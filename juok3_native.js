@@ -1,52 +1,79 @@
-// juok3 (剧OK) — FongMi 原生 Spider v4
-// 配对法解析首页 + 搜索，分类页 JS 渲染回退首页过滤
+// juok3 (剧OK) — FongMi 原生 Spider v5
+// 修复 403：添加 Referer + 完整浏览器 headers
 
 var rule = {
     title: '剧OK',
     host: 'https://juok3.top',
-    url: '/vod/indexindex.html',
+    url: '/',
     homeUrl: '/',
     searchUrl: '/vod/search/**fypage.html',
     searchable: 2,
     quickSearch: 1,
     filterable: 0,
-    timeout: 10000,
+    timeout: 15000,
     headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://juok3.top/',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
     },
     play_parse: 0,
     lazy: ''
 };
 
+// 带 Referer 的 http 请求（详情页需要正确的 Referer）
+function httpGet(url, isDetail) {
+    var h = {};
+    for (var k in rule.headers) h[k] = rule.headers[k];
+    if (isDetail) {
+        // 详情页 Referer 设为分类页
+        h['Referer'] = rule.host + '/category/tv';
+    }
+    try {
+        var resp = http(url, { headers: h, async: false, timeout: rule.timeout });
+        // 如果 403，尝试不同的 Referer
+        if (resp && resp.code === 403) {
+            h['Referer'] = rule.host + '/';
+            resp = http(url, { headers: h, async: false, timeout: rule.timeout });
+        }
+        // 如果还是 403，尝试无 Referer
+        if (resp && resp.code === 403) {
+            delete h['Referer'];
+            resp = http(url, { headers: h, async: false, timeout: rule.timeout });
+        }
+        return resp;
+    } catch (e) {
+        return null;
+    }
+}
+
 // 配对法：分别提取 detail_url、img、title、remark 后按顺序配对
 function pairItems(body) {
     var items = [];
-    // 1) detail URL
     var detailRe = /https:\/\/juok3\.top\/detail\/(\d+)\/(\w+)/g;
     var urls = [];
     var m;
     while ((m = detailRe.exec(body)) !== null) {
         urls.push({ cid: m[1], sid: m[2] });
     }
-    // 2) img
     var imgRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
     var imgs = [];
     while ((m = imgRe.exec(body)) !== null) {
         imgs.push({ alt: m[1], src: m[2] });
     }
-    // 3) **title**
     var boldRe = /\*\*([^*]+)\*\*/g;
     var titles = [];
     while ((m = boldRe.exec(body)) !== null) {
         titles.push(m[1].trim());
     }
-    // 4) remark
     var remRe = /(全\d+集|更新至\d+集|\d{4}-\d{2}-\d{2}期)/g;
     var remarks = [];
     while ((m = remRe.exec(body)) !== null) {
         remarks.push(m[1]);
     }
-    // 配对
     var maxLen = Math.max(urls.length, imgs.length, titles.length);
     for (var i = 0; i < maxLen; i++) {
         if (i >= urls.length || i >= titles.length || !urls[i] || !titles[i]) continue;
@@ -78,7 +105,7 @@ function init(ext) { return ''; }
 
 function home(filter) {
     try {
-        var resp = http(rule.host, { headers: rule.headers, async: false, timeout: rule.timeout });
+        var resp = httpGet(rule.host, false);
         if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
         var items = pairItems(resp.content).slice(0, 20);
         var cls = [
@@ -95,8 +122,8 @@ function home(filter) {
 
 function homeVod() {
     try {
-        var resp = http(rule.host, { headers: rule.headers, async: false, timeout: rule.timeout });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp.code || 'null');
+        var resp = httpGet(rule.host, false);
+        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
         var items = pairItems(resp.content).slice(0, 12);
         return JSON.stringify({ list: items });
     } catch (e) {
@@ -109,8 +136,8 @@ function category(tid, pg, filter, ext) {
         return JSON.stringify({ list: [], page: pg, pagecount: 1, total: 0 });
     }
     try {
-        var resp = http(rule.host, { headers: rule.headers, async: false, timeout: rule.timeout });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp.code || 'null');
+        var resp = httpGet(rule.host, false);
+        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
         var allItems = pairItems(resp.content);
         var filtered = filterByCid(allItems, tid);
         return JSON.stringify({
@@ -131,10 +158,8 @@ function detail(ids) {
         var parts = id.split('_');
         var cid = parts[0], sid = parts[1];
         if (!sid) return JSON.stringify({ list: [] });
-        var resp = http(rule.host + '/detail/' + cid + '/' + sid, {
-            headers: rule.headers, async: false, timeout: rule.timeout
-        });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp.code || 'null');
+        var resp = httpGet(rule.host + '/detail/' + cid + '/' + sid, true);
+        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
         var body = resp.content;
         // 标题
         var nm = body.match(/<h1[^>]*>([^<]+)<\/h1>/i);
@@ -188,10 +213,8 @@ function search(key, quick, pg) {
     if (!pg) pg = '1';
     try {
         var kw = encodeURIComponent(key);
-        var resp = http(rule.host + '/vod/search/' + kw + '-' + pg + '.html', {
-            headers: rule.headers, async: false, timeout: rule.timeout
-        });
-        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp.code || 'null');
+        var resp = httpGet(rule.host + '/vod/search/' + kw + '-' + pg + '.html', false);
+        if (!resp || resp.code !== 200) throw 'HTTP ' + (resp ? resp.code : 'null');
         var items = pairItems(resp.content);
         return JSON.stringify({ list: items, page: parseInt(pg), pagecount: 999, total: items.length });
     } catch (e) {
@@ -201,7 +224,7 @@ function search(key, quick, pg) {
 
 function play(flag, id, flags) {
     try {
-        var resp = http(id, { headers: rule.headers, async: false, timeout: rule.timeout });
+        var resp = httpGet(id, true);
         if (!resp || resp.code !== 200) return JSON.stringify({ url: id, parse: 1 });
         var body = resp.content;
         var fm = body.match(/<iframe[^>]+src="([^"]+)"/);
